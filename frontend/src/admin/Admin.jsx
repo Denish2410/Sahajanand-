@@ -1,50 +1,60 @@
 // Admin panel shell: its own layout (no storefront header/footer), a sign-in
-// screen, and a guard so only admin accounts get in.
-import { useEffect, useState } from 'react';
+// screen, and a guard so only admin accounts see it. The guard here is for
+// convenience only: every admin API call is authorised again on the server.
+import { useCallback, useEffect, useState } from 'react';
 import { Link, matchPath, useLocation, useNavigate } from '../router/index.jsx';
 import { useApp } from '../context/AppContext.jsx';
-import { DEMO_ADMIN } from '../services/store.js';
+import { api } from '../services/api.js';
 import Icon from '../components/Icon/Icon.jsx';
+import { Loading } from '../components/State/State.jsx';
 import Dashboard from './Dashboard.jsx';
 import ProductsAdmin from './ProductsAdmin.jsx';
 import { CategoriesAdmin, CouponsAdmin, OffersAdmin } from './CatalogAdmin.jsx';
 import { OrdersAdmin, EnquiriesAdmin, CustomersAdmin } from './SalesAdmin.jsx';
 import { SettingsAdmin, ActivityAdmin } from './SettingsAdmin.jsx';
 import '../pages/Account/Account.css';
+import '../pages/Auth/Auth.css';
 import './admin.css';
 
 const NAV = [
   ['Overview', [['/admin', 'Dashboard', Dashboard]]],
   ['Sales', [['/admin/orders', 'Orders', OrdersAdmin], ['/admin/enquiries', 'Enquiries', EnquiriesAdmin], ['/admin/customers', 'Customers', CustomersAdmin]]],
-  ['Catalogue', [['/admin/products', 'Products', ProductsAdmin], ['/admin/categories', 'Categories', CategoriesAdmin]]],
+  ['Catalogue', [['/admin/products', 'Products & stock', ProductsAdmin], ['/admin/categories', 'Categories', CategoriesAdmin]]],
   ['Marketing', [['/admin/coupons', 'Coupons', CouponsAdmin], ['/admin/banners', 'Homepage banners', OffersAdmin]]],
   ['System', [['/admin/settings', 'Settings', SettingsAdmin], ['/admin/activity', 'Activity log', ActivityAdmin]]],
 ];
 const PAGES = NAV.flatMap(([, items]) => items);
 
+const Logo = ({ className }) => <p className={className}>SAHAJANAND<span aria-hidden="true" /> <small>Admin</small></p>;
+
 function AdminLogin() {
-  const { login } = useApp();
-  const [id, setId] = useState('');
+  const { login, logout, authConfigured } = useApp();
+  const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [error, setError] = useState('');
-  const submit = (e) => {
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
     e.preventDefault();
-    if (!id.trim() || !pw) return setError('Enter your admin email and password.');
-    const res = login(id, pw, { remember: true, adminOnly: true });
-    if (!res.ok) setError(res.error);
+    if (!email.trim() || !pw) return setError('Enter your admin email and password.');
+    setBusy(true);
+    const res = await login(email, pw, { remember: true });
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    if (!['admin', 'superadmin'].includes(res.user.role)) {
+      await logout();
+      setError('This account does not have admin access.');
+    }
   };
   return (
     <div className="ad-login">
       <form onSubmit={submit} noValidate>
-        <p className="ad-login__logo">ELANPRO<span aria-hidden="true" /> <small>Admin</small></p>
+        <Logo className="ad-login__logo" />
         <h1>Admin sign in</h1>
-        <div className="field"><label htmlFor="al-id">Admin email or mobile number</label><input id="al-id" className="input" value={id} onChange={(e) => { setId(e.target.value); setError(''); }} autoComplete="username" autoFocus /></div>
+        {!authConfigured && <p className="field-error" role="alert">Sign-in is not configured for this site yet.</p>}
+        <div className="field"><label htmlFor="al-id">Admin email</label><input id="al-id" className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} autoComplete="username" autoFocus /></div>
         <div className="field"><label htmlFor="al-pw">Password</label><input id="al-pw" className="input" type="password" value={pw} onChange={(e) => { setPw(e.target.value); setError(''); }} autoComplete="current-password" /></div>
         {error && <p className="field-error" role="alert">{error}</p>}
-        <button className="btn btn-primary btn-block">Sign in to admin</button>
-        <button type="button" className="ad-login__demo" onClick={() => { setId(DEMO_ADMIN.email); setPw(DEMO_ADMIN.password); setError(''); }}>
-          <strong>Demo admin</strong> (tap to fill)<code>{DEMO_ADMIN.email}</code><code>{DEMO_ADMIN.password}</code>
-        </button>
+        <button className="btn btn-primary btn-block" disabled={busy || !authConfigured}>{busy ? 'Signing in…' : 'Sign in to admin'}</button>
         <Link to="/" className="auth__link">Back to the storefront</Link>
       </form>
     </div>
@@ -52,13 +62,29 @@ function AdminLogin() {
 }
 
 export default function Admin() {
-  const { user, isAdmin, logout, db } = useApp();
+  const { user, isAdmin, authReady, logout } = useApp();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(false);
+  const [badges, setBadges] = useState({});
   useEffect(() => { setMenu(false); }, [pathname]);
-  useEffect(() => { document.title = 'Elanpro Admin'; return () => { document.title = 'Elanpro | Commercial refrigeration'; }; }, []);
+  useEffect(() => {
+    document.title = 'Admin | Sahajanand Electronics';
+    let robots = document.head.querySelector('meta[name="robots"]');
+    if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
+    robots.content = 'noindex, nofollow';
+  }, [pathname]);
   useEffect(() => { if (isAdmin && pathname === '/admin/login') navigate('/admin', { replace: true }); }, [isAdmin, pathname, navigate]);
+
+  // Counts shown next to the menu items
+  const refreshBadges = useCallback(() => {
+    api.admin.dashboard()
+      .then((d) => setBadges({ '/admin/orders': d.pendingOrders, '/admin/enquiries': d.newEnquiries, '/admin/products': d.lowStockCount + d.outOfStockCount }))
+      .catch(() => {}); // badges are a convenience; each page reports its own errors
+  }, []);
+  useEffect(() => { if (isAdmin) refreshBadges(); }, [isAdmin, pathname, refreshBadges]);
+
+  if (!authReady) return <div className="ad-login"><div className="ad-login__denied"><Loading label="Checking your sign-in" /></div></div>;
 
   if (!isAdmin) {
     if (user) {
@@ -76,12 +102,11 @@ export default function Admin() {
 
   const path = pathname.replace(/\/$/, '') || '/admin';
   const Page = PAGES.find(([to]) => matchPath(to, path))?.[2];
-  const badges = { '/admin/orders': db.orders.filter((o) => o.status === 'Placed').length, '/admin/enquiries': db.enquiries.filter((e) => e.status === 'New').length, '/admin/products': db.products.filter((p) => p.stock <= db.settings.lowStockThreshold).length };
 
   return (
     <div className={`ad ${menu ? 'is-menu' : ''}`}>
       <aside className="ad-side">
-        <Link to="/admin" className="ad-side__logo">ELANPRO<span aria-hidden="true" /> <small>Admin</small></Link>
+        <Link to="/admin" className="ad-side__logo">SAHAJANAND<span aria-hidden="true" /> <small>Admin</small></Link>
         <nav aria-label="Admin">
           {NAV.map(([group, items]) => (
             <div key={group}>
@@ -94,14 +119,14 @@ export default function Admin() {
         </nav>
         <div className="ad-side__foot">
           <Link to="/">View storefront</Link>
-          <button onClick={() => { logout(); navigate('/admin/login'); }}>Sign out</button>
+          <button onClick={async () => { await logout(); navigate('/admin/login'); }}>Sign out</button>
         </div>
       </aside>
       <div className="ad-main">
         <header className="ad-top">
           <button className="ad-top__burger" onClick={() => setMenu((m) => !m)} aria-label="Toggle menu" aria-expanded={menu}><Icon name="menu" /></button>
           <span className="ad-top__crumb">{PAGES.find(([to]) => to === path)?.[1] || 'Not found'}</span>
-          <span className="ad-top__user"><strong>{user.name}</strong><small>{user.email}</small></span>
+          <span className="ad-top__user"><strong>{user.name}</strong><small>{user.role === 'superadmin' ? 'Super admin' : 'Admin'} · {user.email}</small></span>
         </header>
         <main className="ad-content" key={path}>
           {Page ? <Page /> : <div className="empty"><h1 style={{ fontSize: 'var(--fs-4)' }}>This admin page does not exist</h1><Link to="/admin" className="btn btn-primary">Go to the dashboard</Link></div>}

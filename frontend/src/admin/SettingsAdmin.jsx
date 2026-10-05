@@ -1,112 +1,127 @@
-import { useRef, useState } from 'react';
+// Store settings (super admin) and the activity log.
+import { useEffect, useState } from 'react';
+import { useAsync } from '../hooks/useAsync.js';
 import { useApp } from '../context/AppContext.jsx';
+import { api } from '../services/api.js';
 import { fmtDateTime } from '../utils/format.js';
-import { Head, Text, Num, Area, Check, Pager, usePaged, download, exportCSV } from './ui.jsx';
+import { Loading, ErrorState } from '../components/State/State.jsx';
+import { Head, Text, Num, Area, Check, useList, ServerPager, ListState, useAction, Flash } from './ui.jsx';
+
+const FIELDS = [
+  'storeName', 'legalName', 'announcement', 'supportPhone', 'supportPhoneAlt', 'supportEmail', 'whatsapp', 'address',
+  'businessHours', 'gstin', 'heroTitle', 'heroLede', 'gstInclusive', 'gstPercent', 'deliveryCharge', 'freeDeliveryAbove',
+  'enableCod', 'lowStockThreshold', 'maintenanceMode',
+];
 
 export function SettingsAdmin() {
-  const { db, setColl, updateProfile, resetDemo, importDb, log, user } = useApp();
-  const [s, setS] = useState(db.settings);
-  const [me, setMe] = useState({ name: user.name, phone: user.phone, current: '', next: '' });
-  const [msg, setMsg] = useState('');
-  const file = useRef(null);
-  const flash = (m) => { setMsg(m); window.scrollTo(0, 0); };
+  const { isSuperAdmin, setSettings } = useApp();
+  const { data, loading, error, reload } = useAsync(() => api.admin.settings(), []);
+  const [f, setF] = useState(null);
+  const { run, busy, flash, setFlash } = useAction();
 
-  const saveStore = () => {
-    if (!s.storeName.trim()) return flash('Store name cannot be empty.');
-    if (s.gstPercent < 0 || s.gstPercent > 40) return flash('GST must be between 0 and 40%.');
-    setColl('settings', { ...s, gstPercent: Number(s.gstPercent) || 0, shippingFlat: Number(s.shippingFlat) || 0, freeShippingAbove: Number(s.freeShippingAbove) || 0, lowStockThreshold: Number(s.lowStockThreshold) || 0 });
-    log('updated store settings', user.name); flash('Settings saved. The storefront is updated.');
-  };
-  const saveMe = () => {
-    if (!me.name.trim()) return flash('Name cannot be empty.');
-    const patch = { name: me.name.trim(), phone: me.phone };
-    if (me.next) {
-      if (me.current !== user.password) return flash('Current password is incorrect.');
-      if (me.next.length < 6) return flash('New password must be at least 6 characters.');
-      patch.password = me.next;
-    }
-    updateProfile(patch); setMe({ ...me, current: '', next: '' }); flash(me.next ? 'Profile and password updated.' : 'Profile updated.');
-  };
-  const onImport = (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    f.text().then((t) => {
-      const data = JSON.parse(t);
-      if (!Array.isArray(data.products) || !Array.isArray(data.users)) throw new Error('bad');
-      if (!data.users.some((u) => u.id === user.id)) return flash('Import stopped: the backup does not contain your admin account.');
-      importDb(data); log('imported a data backup', user.name); flash('Backup imported.');
-    }).catch(() => flash('That file is not a valid Elanpro backup (.json).'));
-    e.target.value = '';
+  useEffect(() => {
+    if (data) setF({ ...Object.fromEntries(FIELDS.map((k) => [k, data[k] ?? ''])), serviceAreas: (data.serviceAreas || []).join(', ') });
+  }, [data]);
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!f.storeName.trim()) return setFlash({ ok: false, text: 'Enter the store name.' });
+    const serviceAreas = f.serviceAreas.split(',').map((s) => s.trim()).filter(Boolean);
+    if (serviceAreas.length === 0) return setFlash({ ok: false, text: 'Enter at least one area you serve.' });
+    const body = {
+      ...f, serviceAreas,
+      gstPercent: Number(f.gstPercent) || 0, deliveryCharge: Number(f.deliveryCharge) || 0,
+      freeDeliveryAbove: Number(f.freeDeliveryAbove) || 0, lowStockThreshold: Number(f.lowStockThreshold) || 0,
+    };
+    const saved = await run(() => api.admin.saveSettings(body), 'Settings saved. The storefront now uses them.');
+    if (saved) setSettings((s) => ({ ...s, ...saved }));
   };
 
+  if (loading && !f) return <><Head title="Settings" /><Loading label="Loading settings" /></>;
+  if (error && !f) return <><Head title="Settings" /><ErrorState error={error} onRetry={reload} /></>;
+  if (!f) return null;
+
+  const methods = data.paymentMethods;
   return (
     <>
-      <Head title="Settings" sub="Storefront content, tax and shipping, your admin account and data tools." />
-      {msg && <p className="acct__msg" role="status">{msg}</p>}
+      <Head title="Settings" sub="Store details, pricing rules and notices shown on the website." />
+      {!isSuperAdmin && <p className="acct__warn" role="status">Only a super admin can change these settings. You can view them.</p>}
+      <form onSubmit={save} noValidate style={{ display: 'grid', gap: '1.1rem' }}>
+        <fieldset disabled={!isSuperAdmin || busy} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: '1.1rem', minWidth: 0 }}>
+          <section className="ad-card">
+            <h2>Store and contact details</h2>
+            <p className="muted" style={{ fontSize: 'var(--fs-0)' }}>Shown in the header, footer and contact page. Anything left empty is simply not shown.</p>
+            <div className="ad-form">
+              <Text label="Store name" f={f} set={setF} k="storeName" maxLength={100} />
+              <Text label="Registered business name" f={f} set={setF} k="legalName" maxLength={150} />
+              <Text label="Phone" f={f} set={setF} k="supportPhone" maxLength={30} type="tel" />
+              <Text label="Second phone" f={f} set={setF} k="supportPhoneAlt" maxLength={30} type="tel" />
+              <Text label="Email" f={f} set={setF} k="supportEmail" maxLength={200} type="email" />
+              <Text label="GSTIN" f={f} set={(v) => setF({ ...v, gstin: v.gstin.toUpperCase() })} k="gstin" maxLength={15} />
+              <Area label="Address" f={f} set={setF} k="address" rows={2} />
+              <Text label="Areas served (comma separated)" f={f} set={setF} k="serviceAreas" />
+              <Text label="Business hours" f={f} set={setF} k="businessHours" maxLength={200} />
+            </div>
+          </section>
 
-      <section className="ad-card">
-        <h2>Storefront</h2>
-        <div className="ad-form">
-          <Text label="Store name" f={s} set={setS} k="storeName" />
-          <Text label="Announcement bar text" f={s} set={setS} k="announcement" hint="Shown in the dark strip above the header." />
-          <Text label="Support phone" f={s} set={setS} k="supportPhone" />
-          <Text label="Support email" f={s} set={setS} k="supportEmail" type="email" />
-          <Text wide label="Homepage headline" f={s} set={setS} k="heroTitle" />
-          <Area label="Homepage intro text" f={s} set={setS} k="heroLede" rows={2} />
-        </div>
-        <h2>Tax, shipping and inventory</h2>
-        <div className="ad-form">
-          <Num label="GST (%)" f={s} set={setS} k="gstPercent" min="0" max="40" />
-          <Num label="Flat shipping charge (₹)" f={s} set={setS} k="shippingFlat" min="0" />
-          <Num label="Free shipping above (₹)" f={s} set={setS} k="freeShippingAbove" min="0" />
-          <Num label="Low-stock alert at or below" f={s} set={setS} k="lowStockThreshold" min="0" />
-          <Check label="Maintenance mode (storefront shows a notice to customers; admins still see the site)" f={s} set={setS} k="maintenanceMode" />
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={saveStore}>Save settings</button>
-      </section>
+          <section className="ad-card">
+            <h2>Website text</h2>
+            <div className="ad-form">
+              <Text label="Announcement bar (top of every page)" f={f} set={setF} k="announcement" maxLength={200} wide />
+              <Text label="Home page headline" f={f} set={setF} k="heroTitle" maxLength={150} wide hint="Leave empty to use the default headline" />
+              <Area label="Home page introduction" f={f} set={setF} k="heroLede" rows={2} />
+            </div>
+          </section>
 
-      <section className="ad-card">
-        <h2>Your admin account</h2>
-        <div className="ad-form">
-          <Text label="Name" f={me} set={setMe} k="name" />
-          <Text label="Mobile number" f={me} set={setMe} k="phone" />
-          <div className="field"><label htmlFor="st-email">Email (sign-in ID)</label><input id="st-email" className="input" value={user.email} disabled /></div>
-          <div />
-          <Text label="Current password" f={me} set={setMe} k="current" type="password" autoComplete="current-password" />
-          <Text label="New password" f={me} set={setMe} k="next" type="password" autoComplete="new-password" hint="Leave empty to keep your password." />
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={saveMe}>Update account</button>
-      </section>
+          <section className="ad-card">
+            <h2>Prices, delivery and payment</h2>
+            <div className="ad-form">
+              <Check label="Product prices already include GST" f={f} set={setF} k="gstInclusive" />
+              <Num label="GST rate (%)" f={f} set={setF} k="gstPercent" min={0} max={100} hint={f.gstInclusive ? 'For information only: prices include GST' : 'Added on top of the items at checkout'} />
+              <Num label="Delivery charge (₹)" f={f} set={setF} k="deliveryCharge" min={0} />
+              <Num label="Free delivery for orders of (₹) or more" f={f} set={setF} k="freeDeliveryAbove" min={0} hint="0 = delivery is always free" />
+              <Check label="Accept pay on delivery" f={f} set={setF} k="enableCod" />
+              <Num label="Low-stock warning at (units)" f={f} set={setF} k="lowStockThreshold" min={0} step={1} />
+            </div>
+            <p className="muted" style={{ fontSize: 'var(--fs-0)' }}>
+              Online payment (Razorpay) is {methods.razorpay ? 'switched on' : 'not configured on the server, so customers cannot pay online yet'}.
+              {!methods.razorpay && !f.enableCod && ' With pay on delivery off as well, customers cannot check out.'}
+            </p>
+          </section>
 
-      <section className="ad-card">
-        <h2>Data tools</h2>
-        <p className="muted">All data in this prototype lives in this browser (localStorage). Use a backup to move it to another browser.</p>
-        <div className="ad-head__actions">
-          <button className="btn btn-ghost btn-sm" onClick={() => download(`elanpro-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(db, null, 2), 'application/json')}>Download backup (.json)</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => file.current.click()}>Import backup</button>
-          <input ref={file} type="file" accept="application/json,.json" hidden onChange={onImport} />
-          <button className="btn btn-ghost btn-sm ad-danger" onClick={() => window.confirm('Reset everything to the original demo data? All changes, orders and accounts created since will be lost.') && (resetDemo(), setS(db.settings), flash('Demo data restored. If you changed the admin password, it is back to the demo password.'))}>Reset demo data</button>
+          <section className="ad-card">
+            <h2>Notice</h2>
+            <Check label="Show a “we are updating the store” notice at the top of the website" f={f} set={setF} k="maintenanceMode" />
+          </section>
+        </fieldset>
+
+        <div className="acct__actions">
+          {isSuperAdmin && <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</button>}
+          <Flash flash={flash} />
         </div>
-      </section>
+      </form>
     </>
   );
 }
 
 export function ActivityAdmin() {
-  const { db, setColl } = useApp();
-  const [q, setQ] = useState('');
-  const rows = db.activity.filter((a) => !q || `${a.by} ${a.action}`.toLowerCase().includes(q.toLowerCase()));
-  const pg = usePaged(rows, 20);
+  const list = useList(api.admin.activity, { limit: 30 });
   return (
     <>
-      <Head title="Activity log" sub="The last 200 changes made in the admin panel.">
-        <button className="btn btn-ghost btn-sm" onClick={() => exportCSV('activity.csv', rows, [['When', (a) => fmtDateTime(a.at)], ['Who', 'by'], ['Action', 'action']])}>Export CSV</button>
-        <button className="btn btn-ghost btn-sm ad-danger" onClick={() => window.confirm('Clear the activity log?') && setColl('activity', [])}>Clear log</button>
-      </Head>
-      <div className="ad-toolbar"><input className="input" type="search" placeholder="Search the log" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search activity" /></div>
-      <section className="ad-card">
-        {rows.length === 0 ? <p className="muted">Nothing logged yet. Changes you make in the panel appear here.</p> : <ul className="ad-log">{pg.slice.map((a) => <li key={a.id}><time>{fmtDateTime(a.at)}</time><span><strong>{a.by}</strong> {a.action}</span></li>)}</ul>}
-      </section>
-      <Pager {...pg} onPage={pg.setPage} />
+      <Head title="Activity log" sub="Every change made in the admin panel, newest first." />
+      <div className="ad-toolbar">
+        <input className="input" type="search" placeholder="Search by action or person" aria-label="Search activity" value={list.search} onChange={(e) => list.setSearch(e.target.value)} />
+      </div>
+      <div className="ad-tablewrap">
+        <table className="ad-table">
+          <thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead>
+          <tbody>
+            <ListState list={list} cols={3} empty="No activity recorded yet." />
+            {list.items.map((a) => <tr key={a._id}><td>{fmtDateTime(a.createdAt)}</td><td>{a.userName}</td><td>{a.action}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <ServerPager list={list} />
     </>
   );
 }

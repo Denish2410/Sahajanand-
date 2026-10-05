@@ -1,194 +1,301 @@
-import { useState } from 'react';
+// Categories, coupons and homepage banners.
+import { useRef, useState } from 'react';
+import { Link } from '../router/index.jsx';
+import { useAsync } from '../hooks/useAsync.js';
 import { useApp } from '../context/AppContext.jsx';
-import { productImage, slugify, fmtPrice } from '../utils/format.js';
-import { Head, Pill, Drawer, Text, Num, Area, Select, Check, Empty } from './ui.jsx';
+import { api } from '../services/api.js';
+import { fmtPrice, fmtDate, productImage } from '../utils/format.js';
+import { Loading, ErrorState } from '../components/State/State.jsx';
+import { Head, Pill, Drawer, Text, Num, Area, Select, Check, Empty, useList, ServerPager, ListState, useAction, Flash } from './ui.jsx';
 
-const SCENES = ['kitchen', 'bar', 'retail', 'beach', 'vending', 'bakery', 'parlour', 'supermarket', 'lab', 'store', 'chef'];
+const lines = (text) => text.split('\n').map((s) => s.trim()).filter(Boolean);
+const dateInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
+
+// ─── Categories ──────────────────────────────────────────────────────────────
+function CategoryEditor({ initial, onClose, onSaved }) {
+  const [f, setF] = useState({
+    name: initial?.name || '', shortName: initial?.shortName || '', tagline: initial?.tagline || '',
+    description: initial?.description || '', subcategories: (initial?.subcategories || []).join('\n'),
+    sortOrder: initial?.sortOrder ?? 0, isFeatured: Boolean(initial?.isFeatured), isActive: initial ? initial.isActive : true,
+  });
+  const [file, setFile] = useState(null);
+  const input = useRef(null);
+  const { run, busy, flash, setFlash } = useAction();
+
+  const save = async () => {
+    if (!f.name.trim()) return setFlash({ ok: false, text: 'Enter the category name.' });
+    if (file && file.size > 5 * 1024 * 1024) return setFlash({ ok: false, text: 'The image is larger than 5 MB.' });
+    const saved = await run(() => api.admin.saveCategory(initial?._id, { ...f, name: f.name.trim(), subcategories: lines(f.subcategories), sortOrder: Number(f.sortOrder) || 0 }, file));
+    if (saved) { onSaved(); onClose(); }
+  };
+
+  return (
+    <Drawer title={initial ? `Edit ${initial.name}` : 'Add a category'} onClose={onClose}
+      footer={<><Flash flash={flash} /><button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save category'}</button></>}>
+      <div className="ad-form">
+        <Text label="Name" f={f} set={setF} k="name" maxLength={100} />
+        <Text label="Short name (menu)" f={f} set={setF} k="shortName" maxLength={40} />
+        <Text label="Tagline" f={f} set={setF} k="tagline" maxLength={120} wide />
+        <Area label="Description" f={f} set={setF} k="description" rows={3} />
+        <Area label="Product types (one per line)" f={f} set={setF} k="subcategories" rows={4} hint="Offered as quick filters on the category page" />
+        <Num label="Sort order" f={f} set={setF} k="sortOrder" step={1} hint="Lower numbers appear first" />
+        <div className="field">
+          <span className="ad-label">Image</span>
+          <div className="ad-preview"><img src={file ? URL.createObjectURL(file) : productImage(initial?.image?.url)} alt="" /></div>
+          <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => setFile(e.target.files[0] || null)} aria-label="Choose category image" />
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => input.current.click()}>{file ? file.name : 'Choose image'}</button>
+        </div>
+        <Check label="Active: shown on the store" f={f} set={setF} k="isActive" />
+        <Check label="Large tile on the home page" f={f} set={setF} k="isFeatured" />
+      </div>
+      {initial && <p className="muted" style={{ fontSize: 'var(--fs-0)' }}>The web address of this category (/category/{initial.slug}) stays the same when you rename it.</p>}
+    </Drawer>
+  );
+}
 
 export function CategoriesAdmin() {
-  const { db, upsert, remove, setColl, log, user } = useApp();
-  const [form, setForm] = useState(null);
-  const [error, setError] = useState('');
-  const count = (slug) => db.products.filter((p) => p.category === slug).length;
+  const { reloadCatalogue } = useApp();
+  const { data: categories, loading, error, reload } = useAsync(() => api.admin.categories(), []);
+  const [editing, setEditing] = useState(undefined);
+  const { run, busy, flash } = useAction();
+  const changed = () => { reload(); reloadCatalogue(); };
 
-  const save = () => {
-    if (!form.name.trim()) return setError('Enter a category name.');
-    const slug = form.original || slugify(form.slug || form.name);
-    if (!form.original && db.categories.some((c) => c.slug === slug)) return setError('A category with this URL name already exists.');
-    const { original, subsText, ...rest } = form;
-    const cat = { ...rest, slug, name: form.name.trim(), shortName: form.shortName.trim() || form.name.trim(), subcategories: subsText.split('\n').map((s) => s.trim()).filter(Boolean), scene: form.scene || 'kitchen', image: form.image || 'egn-1500' };
-    upsert('categories', cat, 'slug', original);
-    if (!original) setColl('categories', (list) => [...list.filter((c) => c.slug !== slug), cat]); // new categories go last
-    log(`${original ? 'updated' : 'added'} category ${cat.name}`, user.name);
-    setForm(null);
+  const remove = async (c) => {
+    if (!window.confirm(`Delete the category ${c.name}?`)) return;
+    if (await run(() => api.admin.deleteCategory(c._id), `${c.name} deleted.`)) changed();
   };
-  const move = (i, d) => setColl('categories', (list) => { const a = [...list]; const j = i + d; if (j < 0 || j >= a.length) return a; [a[i], a[j]] = [a[j], a[i]]; return a; });
-  const del = (c) => {
-    if (count(c.slug) > 0) return window.alert(`${c.name} still has ${count(c.slug)} products. Move or delete them first.`);
-    if (window.confirm(`Delete category ${c.name}?`)) { remove('categories', c.slug, 'slug'); log(`deleted category ${c.name}`, user.name); }
+  const toggle = async (c) => {
+    if (await run(() => api.admin.saveCategory(c._id, { isActive: !c.isActive }), `${c.name} is now ${c.isActive ? 'hidden' : 'active'}.`)) changed();
   };
 
   return (
     <>
-      <Head title="Categories" sub="Order here is the order in the storefront menu and homepage.">
-        <button className="btn btn-primary btn-sm" onClick={() => { setForm({ name: '', slug: '', shortName: '', tagline: '', description: '', image: '', scene: 'kitchen', featured: false, subsText: '' }); setError(''); }}>Add category</button>
+      <Head title="Categories" sub="Product lines shown in the menu and on the home page.">
+        <button className="btn btn-primary btn-sm" onClick={() => setEditing(null)}>Add category</button>
       </Head>
-      <div className="ad-tablewrap"><table className="ad-table">
-        <thead><tr><th>Order</th><th>Category</th><th>Subcategories</th><th>Products</th><th>Homepage tile</th><th>Actions</th></tr></thead>
-        <tbody>{db.categories.map((c, i) => (
-          <tr key={c.slug}>
-            <td className="ad-actions"><button onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${c.name} up`}>↑</button><button onClick={() => move(i, 1)} disabled={i === db.categories.length - 1} aria-label={`Move ${c.name} down`}>↓</button></td>
-            <td><div className="ad-prod"><img src={productImage(c.image)} alt="" /><div><strong>{c.name}</strong><small>/category/{c.slug}</small><small>{c.tagline}</small></div></div></td>
-            <td><small>{c.subcategories.join(', ') || 'None'}</small></td>
-            <td className="num">{count(c.slug)}</td>
-            <td><button className="ad-toggle" onClick={() => upsert('categories', { slug: c.slug, featured: !c.featured }, 'slug')}><Pill value={c.featured ? 'Large tile' : 'Standard'} tone={c.featured ? 'active' : 'draft'} /></button></td>
-            <td className="ad-actions">
-              <button onClick={() => { setForm({ ...c, original: c.slug, subsText: c.subcategories.join('\n') }); setError(''); }}>Edit</button>
-              <a href={`/category/${c.slug}`} target="_blank" rel="noreferrer">View</a>
-              <button className="ad-danger" onClick={() => del(c)}>Delete</button>
-            </td>
-          </tr>
-        ))}</tbody>
-      </table></div>
-      {form && (
-        <Drawer title={form.original ? `Edit ${form.name}` : 'Add category'} onClose={() => setForm(null)}
-          footer={<>{error && <p className="field-error" role="alert">{error}</p>}<button className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save}>Save category</button></>}>
-          <div className="ad-form">
-            <Text label="Name" f={form} set={setForm} k="name" />
-            <Text label="Short name (menu)" f={form} set={setForm} k="shortName" />
-            {!form.original && <Text wide label="URL name" f={form} set={setForm} k="slug" hint="Leave empty to generate from the name. Cannot be changed later." />}
-            <Text wide label="Tagline" f={form} set={setForm} k="tagline" />
-            <Area label="Description" f={form} set={setForm} k="description" />
-            <Text label="Tile image" f={form} set={setForm} k="image" hint="Image URL or local product image name." />
-            <Select label="Banner photo" f={form} set={setForm} k="scene" options={SCENES} />
-            <Area label="Subcategories (one per line)" f={form} set={setForm} k="subsText" rows={5} />
-            <Check label="Show as a large tile on the homepage" f={form} set={setForm} k="featured" />
-          </div>
-        </Drawer>
-      )}
+      <Flash flash={flash} />
+      {loading && !categories && <Loading label="Loading categories" />}
+      {error && !categories && <ErrorState error={error} onRetry={reload} />}
+      {categories && (categories.length === 0 ? <Empty>No categories yet. Add one to start building the catalogue.</Empty> : (
+        <div className="ad-tablewrap">
+          <table className="ad-table">
+            <thead><tr><th>Category</th><th>Products</th><th>Order</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {categories.map((c) => (
+                <tr key={c._id}>
+                  <td><div className="ad-prod"><img src={productImage(c.image?.url)} alt="" loading="lazy" /><div><strong>{c.name}</strong>{c.isFeatured && <Pill value="Large tile" tone="confirmed" />}<small>{c.tagline || c.description}</small></div></div></td>
+                  <td className="num">{c.productCount}</td>
+                  <td className="num">{c.sortOrder}</td>
+                  <td><button className="ad-toggle" disabled={busy} onClick={() => toggle(c)} title="Click to change"><Pill value={c.isActive ? 'Active' : 'Hidden'} tone={c.isActive ? 'active' : 'draft'} /></button></td>
+                  <td className="ad-actions">
+                    <button onClick={() => setEditing(c)}>Edit</button>
+                    <Link to="/admin/products">Products</Link>
+                    <button className="ad-danger" disabled={busy || c.productCount > 0} title={c.productCount > 0 ? 'Move or delete its products first' : undefined} onClick={() => remove(c)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      {editing !== undefined && <CategoryEditor initial={editing} onClose={() => setEditing(undefined)} onSaved={changed} />}
     </>
+  );
+}
+
+// ─── Coupons ─────────────────────────────────────────────────────────────────
+function CouponEditor({ initial, categories, onClose, onSaved }) {
+  const [f, setF] = useState({
+    code: initial?.code || '', description: initial?.description || '',
+    discountType: initial?.discountType || 'percent', discountValue: initial?.discountValue ?? '',
+    maxDiscount: initial?.maxDiscount ?? 0, minOrderValue: initial?.minOrderValue ?? 0,
+    usageLimit: initial?.usageLimit ?? 0, perUserLimit: initial?.perUserLimit ?? 1,
+    category: initial?.category?._id || '', showOnStorefront: Boolean(initial?.showOnStorefront),
+    startsAt: dateInput(initial?.startsAt) || dateInput(new Date()), expiresAt: dateInput(initial?.expiresAt),
+    isActive: initial ? initial.isActive : true,
+  });
+  const { run, busy, flash, setFlash } = useAction();
+
+  const save = async () => {
+    if (!/^[A-Za-z0-9_-]+$/.test(f.code.trim())) return setFlash({ ok: false, text: 'The code can use letters, digits, - and _ only.' });
+    if (f.discountValue === '' || Number(f.discountValue) <= 0) return setFlash({ ok: false, text: 'Enter a discount greater than 0.' });
+    if (f.discountType === 'percent' && Number(f.discountValue) > 100) return setFlash({ ok: false, text: 'A percentage discount cannot be more than 100.' });
+    if (!f.expiresAt) return setFlash({ ok: false, text: 'Choose an expiry date.' });
+    if (f.startsAt && f.expiresAt < f.startsAt) return setFlash({ ok: false, text: 'The expiry date is before the start date.' });
+    const body = {
+      ...f, code: f.code.trim(), category: f.category || null,
+      discountValue: Number(f.discountValue), maxDiscount: Number(f.maxDiscount) || 0, minOrderValue: Number(f.minOrderValue) || 0,
+      usageLimit: Number(f.usageLimit) || 0, perUserLimit: Number(f.perUserLimit) || 1,
+      startsAt: new Date(`${f.startsAt}T00:00:00`).toISOString(), expiresAt: new Date(`${f.expiresAt}T23:59:59`).toISOString(),
+    };
+    const saved = await run(() => (initial ? api.admin.updateCoupon(initial._id, body) : api.admin.createCoupon(body)));
+    if (saved) { onSaved(); onClose(); }
+  };
+
+  return (
+    <Drawer title={initial ? `Edit ${initial.code}` : 'Create a coupon'} onClose={onClose}
+      footer={<><Flash flash={flash} /><button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save coupon'}</button></>}>
+      <div className="ad-form">
+        <Text label="Code" f={f} set={(v) => setF({ ...v, code: v.code.toUpperCase() })} k="code" maxLength={30} />
+        <Select label="Type" f={f} set={setF} k="discountType" options={[['percent', 'Percentage off'], ['flat', 'Fixed amount off']]} />
+        <Num label={f.discountType === 'percent' ? 'Discount (%)' : 'Discount (₹)'} f={f} set={setF} k="discountValue" min={0} />
+        {f.discountType === 'percent' && <Num label="Maximum discount (₹)" f={f} set={setF} k="maxDiscount" min={0} hint="0 = no cap" />}
+        <Num label="Minimum order (₹)" f={f} set={setF} k="minOrderValue" min={0} />
+        <Select label="Limit to a category" f={f} set={setF} k="category" options={[['', 'All products'], ...categories.map((c) => [c._id, c.name])]} />
+        <Num label="Total uses allowed" f={f} set={setF} k="usageLimit" min={0} step={1} hint="0 = unlimited" />
+        <Num label="Uses per customer" f={f} set={setF} k="perUserLimit" min={1} step={1} />
+        <Text label="Starts" f={f} set={setF} k="startsAt" type="date" />
+        <Text label="Expires" f={f} set={setF} k="expiresAt" type="date" />
+        <Text label="Description (shown to customers)" f={f} set={setF} k="description" maxLength={200} wide />
+        <Check label="Active" f={f} set={setF} k="isActive" />
+        <Check label="Advertise on the home page" f={f} set={setF} k="showOnStorefront" />
+      </div>
+    </Drawer>
   );
 }
 
 export function CouponsAdmin() {
-  const { db, upsert, remove, log, user } = useApp();
-  const [form, setForm] = useState(null);
-  const [error, setError] = useState('');
-  const today = new Date().toISOString().slice(0, 10);
-  const save = () => {
-    const code = form.code.toUpperCase().replace(/\s/g, '');
-    if (!code) return setError('Enter a coupon code.');
-    if (!form.original && db.coupons.some((c) => c.code === code)) return setError('This code already exists.');
-    if (!(Number(form.value) > 0)) return setError('Enter a discount value greater than 0.');
-    if (form.type === 'percent' && form.value > 90) return setError('Percentage discounts are limited to 90%.');
-    const { original, value, ...rest } = form;
-    const coupon = { ...rest, code, discount: form.type === 'percent' ? Number(value) / 100 : Number(value), minOrder: Number(form.minOrder) || 0,
-      label: form.label.trim() || (form.type === 'percent' ? `${value}% Off` : `${fmtPrice(value)} Off`), used: form.used || 0 };
-    upsert('coupons', coupon, 'code', original); log(`${original ? 'updated' : 'created'} coupon ${code}`, user.name); setForm(null);
+  const { reloadCatalogue } = useApp();
+  const list = useList(api.admin.coupons);
+  const { data: categories } = useAsync(() => api.admin.categories(), []);
+  const [editing, setEditing] = useState(undefined);
+  const { run, busy, flash } = useAction();
+  const changed = () => { list.reload(); reloadCatalogue(); };
+  const now = Date.now();
+
+  const remove = async (c) => {
+    if (!window.confirm(`Delete the coupon ${c.code}?`)) return;
+    if (await run(() => api.admin.deleteCoupon(c._id), `${c.code} deleted.`)) changed();
   };
+  const toggle = async (c) => {
+    if (await run(() => api.admin.updateCoupon(c._id, { isActive: !c.isActive }))) changed();
+  };
+  const state = (c) => (!c.isActive ? ['Off', 'draft'] : new Date(c.expiresAt) < now ? ['Expired', 'bad'] : new Date(c.startsAt) > now ? ['Scheduled', 'pending'] : c.usageLimit > 0 && c.usedCount >= c.usageLimit ? ['Used up', 'bad'] : ['Active', 'active']);
+
   return (
     <>
-      <Head title="Coupons" sub="Active, unexpired coupons appear on the homepage and can be applied in the cart.">
-        <button className="btn btn-primary btn-sm" onClick={() => { setForm({ code: '', label: '', description: '', type: 'percent', value: 10, minOrder: 0, category: '', active: true, expires: '' }); setError(''); }}>Create coupon</button>
+      <Head title="Coupons" sub="Discount codes customers can apply in their cart.">
+        <button className="btn btn-primary btn-sm" onClick={() => setEditing(null)}>Create coupon</button>
       </Head>
-      {db.coupons.length === 0 ? <Empty>No coupons yet. Create one to show it on the homepage.</Empty> : (
-        <div className="ad-tablewrap"><table className="ad-table">
-          <thead><tr><th>Code</th><th>Discount</th><th>Conditions</th><th>Expires</th><th>Used</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>{db.coupons.map((c) => {
-            const expired = c.expires && c.expires < today;
-            return (
-              <tr key={c.code}>
-                <td><strong className="num">{c.code}</strong><small>{c.description}</small></td>
-                <td>{c.type === 'percent' ? `${Math.round(c.discount * 100)}%` : fmtPrice(c.discount)}</td>
-                <td><small>{c.minOrder ? `Min. order ${fmtPrice(c.minOrder)}` : 'No minimum'}</small><small>{c.category ? db.categories.find((x) => x.slug === c.category)?.name || c.category : 'All categories'}</small></td>
-                <td>{c.expires || 'Never'}</td>
-                <td className="num">{c.used || 0}</td>
-                <td><button className="ad-toggle" onClick={() => upsert('coupons', { code: c.code, active: !c.active }, 'code')}><Pill value={expired ? 'Expired' : c.active ? 'Active' : 'Off'} tone={expired ? 'cancelled' : c.active ? 'active' : 'draft'} /></button></td>
-                <td className="ad-actions">
-                  <button onClick={() => { setForm({ ...c, original: c.code, value: c.type === 'percent' ? Math.round(c.discount * 100) : c.discount }); setError(''); }}>Edit</button>
-                  <button className="ad-danger" onClick={() => window.confirm(`Delete coupon ${c.code}?`) && (remove('coupons', c.code, 'code'), log(`deleted coupon ${c.code}`, user.name))}>Delete</button>
-                </td>
-              </tr>
-            );
-          })}</tbody>
-        </table></div>
-      )}
-      {form && (
-        <Drawer title={form.original ? `Edit ${form.code}` : 'Create coupon'} onClose={() => setForm(null)}
-          footer={<>{error && <p className="field-error" role="alert">{error}</p>}<button className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save}>Save coupon</button></>}>
-          <div className="ad-form">
-            <Text label="Code" f={form} set={setForm} k="code" disabled={!!form.original} />
-            <Text label="Label on card" f={form} set={setForm} k="label" placeholder="10% Off" />
-            <Text wide label="Description" f={form} set={setForm} k="description" />
-            <Select label="Discount type" f={form} set={setForm} k="type" options={[['percent', 'Percentage'], ['flat', 'Flat amount (₹)']]} />
-            <Num label={form.type === 'percent' ? 'Percent off' : 'Amount off (₹)'} f={form} set={setForm} k="value" min="0" />
-            <Num label="Minimum order (₹)" f={form} set={setForm} k="minOrder" min="0" />
-            <Select label="Valid for" f={form} set={setForm} k="category" options={[['', 'All categories'], ...db.categories.map((c) => [c.slug, c.name])]} />
-            <Text label="Expiry date" f={form} set={setForm} k="expires" type="date" hint="Leave empty for no expiry." />
-            <Check label="Active" f={form} set={setForm} k="active" />
-          </div>
-        </Drawer>
-      )}
+      <Flash flash={flash} />
+      <div className="ad-toolbar">
+        <input className="input" type="search" placeholder="Search by code or description" aria-label="Search coupons" value={list.search} onChange={(e) => list.setSearch(e.target.value)} />
+      </div>
+      <div className="ad-tablewrap">
+        <table className="ad-table">
+          <thead><tr><th>Code</th><th>Discount</th><th>Conditions</th><th>Used</th><th>Expires</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+          <tbody>
+            <ListState list={list} cols={7} empty="No coupons yet." />
+            {list.items.map((c) => {
+              const [label, tone] = state(c);
+              return (
+                <tr key={c._id}>
+                  <td><strong className="num">{c.code}</strong>{c.showOnStorefront && <Pill value="On home page" tone="confirmed" />}<small>{c.description}</small></td>
+                  <td className="num">{c.discountType === 'percent' ? `${c.discountValue}%` : fmtPrice(c.discountValue)}{c.discountType === 'percent' && c.maxDiscount > 0 && <small>up to {fmtPrice(c.maxDiscount)}</small>}</td>
+                  <td>{c.minOrderValue > 0 ? `Min. ${fmtPrice(c.minOrderValue)}` : 'No minimum'}<small>{c.category ? `${c.category.name} only` : 'All products'}</small></td>
+                  <td className="num">{c.usedCount}{c.usageLimit > 0 && ` / ${c.usageLimit}`}</td>
+                  <td>{fmtDate(c.expiresAt)}</td>
+                  <td><button className="ad-toggle" disabled={busy} onClick={() => toggle(c)} title="Click to switch on or off"><Pill value={label} tone={tone} /></button></td>
+                  <td className="ad-actions"><button onClick={() => setEditing(c)}>Edit</button><button className="ad-danger" disabled={busy} onClick={() => remove(c)}>Delete</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <ServerPager list={list} />
+      {editing !== undefined && <CouponEditor initial={editing} categories={categories || []} onClose={() => setEditing(undefined)} onSaved={changed} />}
     </>
   );
 }
 
-export function OffersAdmin() {
-  const { db, upsert, remove, setColl, log, user } = useApp();
-  const [form, setForm] = useState(null);
-  const [error, setError] = useState('');
-  const move = (i, d) => setColl('offers', (list) => { const a = [...list]; const j = i + d; if (j < 0 || j >= a.length) return a; [a[i], a[j]] = [a[j], a[i]]; return a; });
-  const save = () => {
-    if (!form.title.trim()) return setError('Enter a slide title.');
-    if (!db.products.some((p) => p.model === form.productModel)) return setError('Choose the product this slide links to.');
-    const { factsText, ...rest } = form;
-    const offer = { ...rest, id: form.id || `offer-${Date.now().toString(36)}`, facts: factsText.split(',').map((s) => s.trim()).filter(Boolean), cta: form.cta || 'Explore product' };
-    const isNew = !form.id;
-    upsert('offers', offer);
-    if (isNew) setColl('offers', (list) => [...list.filter((o) => o.id !== offer.id), offer]);
-    log(`${isNew ? 'added' : 'updated'} banner “${offer.title}”`, user.name); setForm(null);
+// ─── Homepage banners ────────────────────────────────────────────────────────
+function BannerEditor({ initial, onClose, onSaved }) {
+  const [f, setF] = useState({
+    badge: initial?.badge || '', title: initial?.title || '', subtitle: initial?.subtitle || '',
+    product: initial?.product?._id || '', facts: (initial?.facts || []).join('\n'), cta: initial?.cta || 'Explore product',
+    tone: initial?.tone || 'ice', sortOrder: initial?.sortOrder ?? 0, isActive: initial ? initial.isActive : true,
+  });
+  const [search, setSearch] = useState('');
+  const { data: found } = useAsync(() => api.admin.products({ search, limit: 20, isActive: 'true', sort: 'name' }), [search]);
+  const { run, busy, flash, setFlash } = useAction();
+  const options = found?.items || [];
+  const chosen = options.find((p) => p._id === f.product) || (initial?.product?._id === f.product ? initial.product : null);
+
+  const save = async () => {
+    if (!f.title.trim()) return setFlash({ ok: false, text: 'Enter a title.' });
+    if (!f.product) return setFlash({ ok: false, text: 'Choose the product this banner points to.' });
+    const body = { ...f, title: f.title.trim(), facts: lines(f.facts).slice(0, 4), sortOrder: Number(f.sortOrder) || 0 };
+    const saved = await run(() => (initial ? api.admin.updateBanner(initial._id, body) : api.admin.createBanner(body)));
+    if (saved) { onSaved(); onClose(); }
   };
+
+  return (
+    <Drawer title={initial ? 'Edit banner' : 'Add a banner'} onClose={onClose}
+      footer={<><Flash flash={flash} /><button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save banner'}</button></>}>
+      <div className="ad-form">
+        <Text label="Title" f={f} set={setF} k="title" maxLength={120} wide />
+        <Text label="Small label above the title" f={f} set={setF} k="badge" maxLength={60} wide />
+        <Area label="Text" f={f} set={setF} k="subtitle" rows={2} />
+        <div className="field ad-wide">
+          <label htmlFor="bn-search">Product</label>
+          <input id="bn-search" className="input" type="search" placeholder="Search active products by model or name" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="select" aria-label="Choose product" value={f.product} onChange={(e) => setF({ ...f, product: e.target.value })}>
+            <option value="">Choose a product</option>
+            {chosen && !options.some((p) => p._id === chosen._id) && <option value={chosen._id}>{chosen.model || chosen.name}</option>}
+            {options.map((p) => <option key={p._id} value={p._id}>{p.model ? `${p.model}, ${p.name}` : p.name}</option>)}
+          </select>
+        </div>
+        <Area label="Key facts (one per line, up to 4)" f={f} set={setF} k="facts" rows={3} />
+        <Text label="Button text" f={f} set={setF} k="cta" maxLength={40} />
+        <Select label="Colour" f={f} set={setF} k="tone" options={[['ice', 'Light'], ['steel', 'Steel'], ['dark', 'Dark']]} />
+        <Num label="Sort order" f={f} set={setF} k="sortOrder" step={1} />
+        <Check label="Shown on the home page" f={f} set={setF} k="isActive" />
+      </div>
+    </Drawer>
+  );
+}
+
+export function OffersAdmin() {
+  const { reloadCatalogue } = useApp();
+  const { data: banners, loading, error, reload } = useAsync(() => api.admin.banners(), []);
+  const [editing, setEditing] = useState(undefined);
+  const { run, busy, flash } = useAction();
+  const changed = () => { reload(); reloadCatalogue(); };
+
+  const remove = async (b) => {
+    if (!window.confirm(`Delete the banner “${b.title}”?`)) return;
+    if (await run(() => api.admin.deleteBanner(b._id), 'Banner deleted.')) changed();
+  };
+  const toggle = async (b) => { if (await run(() => api.admin.updateBanner(b._id, { isActive: !b.isActive }))) changed(); };
+
   return (
     <>
-      <Head title="Homepage banners" sub="Slides in the homepage carousel, in display order. Each slide links to one product.">
-        <button className="btn btn-primary btn-sm" onClick={() => { setForm({ badge: 'Featured solution', title: '', subtitle: '', productModel: db.products[0]?.model || '', factsText: '', cta: 'Explore product', tone: 'steel', active: true }); setError(''); }}>Add slide</button>
+      <Head title="Homepage banners" sub="Slides in the carousel on the home page. Each one points to a product.">
+        <button className="btn btn-primary btn-sm" onClick={() => setEditing(null)}>Add banner</button>
       </Head>
-      {db.offers.length === 0 ? <Empty>No slides. The carousel is hidden until you add one.</Empty> : (
-        <div className="ad-tablewrap"><table className="ad-table">
-          <thead><tr><th>Order</th><th>Slide</th><th>Product</th><th>Badge</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>{db.offers.map((o, i) => {
-            const p = db.products.find((x) => x.model === o.productModel);
-            return (
-              <tr key={o.id}>
-                <td className="ad-actions"><button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button><button onClick={() => move(i, 1)} disabled={i === db.offers.length - 1} aria-label="Move down">↓</button></td>
-                <td><strong>{o.title}</strong><small>{o.subtitle}</small></td>
-                <td>{p ? <div className="ad-prod"><img src={productImage(p.image)} alt="" /><div><strong>{p.model}</strong></div></div> : <Pill value="Product missing" tone="cancelled" />}</td>
-                <td>{o.badge}</td>
-                <td><button className="ad-toggle" onClick={() => upsert('offers', { id: o.id, active: o.active === false })}><Pill value={o.active === false ? 'Hidden' : 'Active'} tone={o.active === false ? 'draft' : 'active'} /></button></td>
-                <td className="ad-actions">
-                  <button onClick={() => { setForm({ ...o, factsText: (o.facts || []).join(', ') }); setError(''); }}>Edit</button>
-                  <button className="ad-danger" onClick={() => window.confirm(`Delete slide “${o.title}”?`) && (remove('offers', o.id), log(`deleted banner “${o.title}”`, user.name))}>Delete</button>
-                </td>
-              </tr>
-            );
-          })}</tbody>
-        </table></div>
-      )}
-      {form && (
-        <Drawer title={form.id ? 'Edit slide' : 'Add slide'} onClose={() => setForm(null)}
-          footer={<>{error && <p className="field-error" role="alert">{error}</p>}<button className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save}>Save slide</button></>}>
-          <div className="ad-form">
-            <Text label="Badge" f={form} set={setForm} k="badge" hint="e.g. Featured solution, New product. No fake discounts." />
-            <Select label="Product" f={form} set={setForm} k="productModel" options={db.products.map((p) => [p.model, `${p.model}, ${p.name}`])} />
-            <Text wide label="Title" f={form} set={setForm} k="title" />
-            <Area label="Subtitle" f={form} set={setForm} k="subtitle" rows={2} />
-            <Text wide label="Fact chips (comma separated)" f={form} set={setForm} k="factsText" placeholder="1300 L, 2°C to 8°C, R290" />
-            <Text label="Button text" f={form} set={setForm} k="cta" />
-            <Select label="Image background" f={form} set={setForm} k="tone" options={[['steel', 'Steel grey'], ['ice', 'Ice blue'], ['dark', 'Deep blue']]} />
-            <Check label="Active" f={form} set={setForm} k="active" />
-          </div>
-        </Drawer>
-      )}
+      <Flash flash={flash} />
+      {loading && !banners && <Loading label="Loading banners" />}
+      {error && !banners && <ErrorState error={error} onRetry={reload} />}
+      {banners && (banners.length === 0 ? <Empty>No banners. The home page hides the carousel until you add one.</Empty> : (
+        <div className="ad-tablewrap">
+          <table className="ad-table">
+            <thead><tr><th>Banner</th><th>Product</th><th>Order</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {banners.map((b) => (
+                <tr key={b._id}>
+                  <td><strong>{b.title}</strong><small>{b.badge}</small></td>
+                  <td>{b.product ? <div className="ad-prod"><img src={productImage(b.product.images?.[0]?.url)} alt="" loading="lazy" /><div><strong>{b.product.model || b.product.name}</strong>{!b.product.isActive && <small>Hidden product: banner not shown</small>}</div></div> : <span className="field-error">Product missing</span>}</td>
+                  <td className="num">{b.sortOrder}</td>
+                  <td><button className="ad-toggle" disabled={busy} onClick={() => toggle(b)} title="Click to change"><Pill value={b.isActive ? 'Shown' : 'Hidden'} tone={b.isActive ? 'active' : 'draft'} /></button></td>
+                  <td className="ad-actions"><button onClick={() => setEditing(b)}>Edit</button><button className="ad-danger" disabled={busy} onClick={() => remove(b)}>Delete</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      {editing !== undefined && <BannerEditor initial={editing} onClose={() => setEditing(undefined)} onSaved={changed} />}
     </>
   );
 }

@@ -1,181 +1,295 @@
-import { useMemo, useState } from 'react';
+// Products and inventory: search, filter by category / status / stock level,
+// quick stock changes, and a full editor with image upload.
+import { useRef, useState } from 'react';
+import { useAsync } from '../hooks/useAsync.js';
 import { useApp } from '../context/AppContext.jsx';
-import { fmtPrice, productImage, tempClass } from '../utils/format.js';
-import { Head, Pill, Drawer, Text, Num, Area, Select, Check, Pager, usePaged, exportCSV, Empty } from './ui.jsx';
+import { api } from '../services/api.js';
+import { fmtPrice, productImage } from '../utils/format.js';
+import { Head, Pill, Drawer, Text, Num, Area, Select, Check, useList, ServerPager, ListState, useAction, Flash } from './ui.jsx';
 
-const BLANK = { model: '', name: '', category: '', subcategory: '', description: '', price: 0, mrp: 0, priceSource: 'indicative', stock: 0, status: 'active', featured: false, image: '', galleryText: '', badgesText: '', featuresText: '', applicationsText: '', specifications: [{ label: '', value: '' }], tMin: '', tMax: '', capacityL: '', refrigerant: '', cooling: '' };
-const lines = (t) => String(t || '').split('\n').map((s) => s.trim()).filter(Boolean);
-const commas = (t) => String(t || '').split(',').map((s) => s.trim()).filter(Boolean);
+const TEMP_CLASSES = ['', 'Ultra-low', 'Freezer', 'Dual / convertible', 'Chiller', 'Heated'];
+const lines = (text) => text.split('\n').map((s) => s.trim()).filter(Boolean);
+const MAX_IMAGE_MB = 5;
 
 const toForm = (p) => ({
-  ...BLANK, ...p,
-  galleryText: (p.gallery || []).join('\n'), badgesText: (p.badges || []).join(', '), featuresText: (p.features || []).join('\n'),
-  applicationsText: (p.applications || []).join(', '), specifications: p.specifications?.length ? p.specifications.map((s) => ({ ...s })) : [{ label: '', value: '' }],
-  tMin: p.temp ? p.temp[0] : '', tMax: p.temp ? p.temp[1] : '', capacityL: p.capacityL ?? '',
+  model: p?.model || '', name: p?.name || '', brand: p?.brand ?? 'Elanpro', sku: p?.sku || '',
+  category: p?.category?._id || p?.category || '', subcategory: p?.subcategory || '',
+  familyId: p?.familyId || '', familyName: p?.familyName || '',
+  price: p?.price ?? '', mrp: p?.mrp ?? '', stock: p?.stock ?? 0,
+  description: p?.description || '',
+  features: (p?.features || []).join('\n'), applications: (p?.applications || []).join('\n'), badges: (p?.badges || []).join(', '),
+  specs: (p?.specs || []).map((s) => ({ key: s.key, value: s.value })),
+  tempMin: p?.temp?.min ?? '', tempMax: p?.temp?.max ?? '', tempClass: p?.tempClass || '',
+  capacityL: p?.capacityL ?? '', refrigerant: p?.refrigerant || '', cooling: p?.cooling || '',
+  warrantyMonths: p?.warrantyMonths ?? 0, sortOrder: p?.sortOrder ?? 0,
+  isFeatured: Boolean(p?.isFeatured), isActive: p ? Boolean(p.isActive) : true,
 });
 
-export default function ProductsAdmin() {
-  const { db, upsert, remove, log, uniqueProductId, user } = useApp();
-  const [q, setQ] = useState('');
-  const [cat, setCat] = useState('');
-  const [status, setStatus] = useState('');
-  const [sort, setSort] = useState('newest');
-  const [sel, setSel] = useState([]);
-  const [form, setForm] = useState(null);
-  const [error, setError] = useState('');
-  const catName = (slug) => db.categories.find((c) => c.slug === slug)?.name || slug;
-  const low = db.settings.lowStockThreshold;
-
-  const rows = useMemo(() => {
-    let r = db.products.filter((p) => (!cat || p.category === cat)
-      && (!status || (status === 'low' ? p.stock <= low : status === 'featured' ? p.featured : p.status === status))
-      && (!q || `${p.model} ${p.name} ${p.subcategory}`.toLowerCase().includes(q.toLowerCase())));
-    const s = { newest: (a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''), model: (a, b) => a.model.localeCompare(b.model), priceAsc: (a, b) => a.price - b.price, priceDesc: (a, b) => b.price - a.price, stock: (a, b) => a.stock - b.stock }[sort];
-    return [...r].sort(s);
-  }, [db.products, q, cat, status, sort, low]);
-  const pg = usePaged(rows, 10);
-  const subs = db.categories.find((c) => c.slug === form?.category)?.subcategories || [];
-
-  const save = () => {
-    if (!form.model.trim() || !form.name.trim()) return setError('Model and name are required.');
-    if (!form.category) return setError('Choose a category.');
-    if (!(Number(form.price) > 0)) return setError('Enter a price greater than 0.');
-    const isNew = !form.id;
-    const id = isNew ? uniqueProductId(form.model) : form.id;
-    const temp = form.tMin !== '' && form.tMax !== '' ? [Math.min(form.tMin, form.tMax), Math.max(form.tMin, form.tMax)] : null;
-    const image = form.image.trim() || db.categories.find((c) => c.slug === form.category)?.image || '';
-    const { galleryText, badgesText, featuresText, applicationsText, tMin, tMax, ...rest } = form;
-    const product = {
-      ...rest, id, model: form.model.trim(), name: form.name.trim(), image,
-      gallery: [image, ...lines(galleryText).filter((g) => g !== image)], badges: commas(badgesText), features: lines(featuresText), applications: commas(applicationsText),
-      specifications: form.specifications.filter((s) => s.label.trim() && s.value.trim()),
-      temp, tempClass: tempClass(temp), capacityL: form.capacityL === '' ? null : Number(form.capacityL),
-      price: Number(form.price), mrp: Number(form.mrp) || 0, stock: Math.max(0, Number(form.stock) || 0),
-      familyId: form.familyId || `custom-${id}`, familyName: form.familyName || form.name.trim(),
-      subcategory: form.subcategory || subs[0] || 'General', createdAt: form.createdAt || new Date().toISOString(),
-    };
-    upsert('products', product);
-    log(`${isNew ? 'added' : 'updated'} product ${product.model}`, user.name);
-    setForm(null); setError('');
+function toPayload(f) {
+  const hasTemp = f.tempMin !== '' && f.tempMax !== '';
+  return {
+    model: f.model.trim(), name: f.name.trim(), brand: f.brand.trim(), sku: f.sku.trim(),
+    category: f.category, subcategory: f.subcategory.trim(), familyId: f.familyId.trim(), familyName: f.familyName.trim(),
+    price: Number(f.price), mrp: Number(f.mrp === '' ? f.price : f.mrp), stock: Number(f.stock),
+    description: f.description.trim(),
+    features: lines(f.features), applications: lines(f.applications),
+    badges: f.badges.split(',').map((s) => s.trim()).filter(Boolean),
+    specs: f.specs.map((s) => ({ key: s.key.trim(), value: s.value.trim() })).filter((s) => s.key),
+    temp: hasTemp ? { min: Number(f.tempMin), max: Number(f.tempMax) } : null,
+    tempClass: f.tempClass, capacityL: f.capacityL === '' ? null : Number(f.capacityL),
+    refrigerant: f.refrigerant.trim(), cooling: f.cooling.trim(),
+    warrantyMonths: Number(f.warrantyMonths) || 0, sortOrder: Number(f.sortOrder) || 0,
+    isFeatured: f.isFeatured, isActive: f.isActive,
   };
-  const del = (ids) => {
-    if (!window.confirm(`Delete ${ids.length} product${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
-    remove('products', ids); log(`deleted ${ids.length} product(s)`, user.name); setSel([]);
+}
+
+function validate(f) {
+  if (!f.name.trim()) return 'Enter the product name.';
+  if (!f.category) return 'Choose a category.';
+  if (f.price === '' || Number(f.price) < 0) return 'Enter a price of 0 or more.';
+  if (f.mrp !== '' && Number(f.mrp) < Number(f.price)) return 'MRP cannot be lower than the selling price.';
+  if (!Number.isInteger(Number(f.stock)) || Number(f.stock) < 0) return 'Stock must be a whole number, 0 or more.';
+  if ((f.tempMin === '') !== (f.tempMax === '')) return 'Enter both the minimum and maximum temperature, or leave both empty.';
+  if (f.tempMin !== '' && Number(f.tempMin) > Number(f.tempMax)) return 'Minimum temperature cannot be above the maximum.';
+  return '';
+}
+
+function Images({ product, onChange }) {
+  const input = useRef(null);
+  const { run, busy, flash, setFlash } = useAction();
+
+  const upload = async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (!files.length) return;
+    const bad = files.find((f) => !['image/jpeg', 'image/png', 'image/webp'].includes(f.type));
+    if (bad) return setFlash({ ok: false, text: `${bad.name} is not a JPG, PNG or WebP image.` });
+    const big = files.find((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+    if (big) return setFlash({ ok: false, text: `${big.name} is larger than ${MAX_IMAGE_MB} MB.` });
+    if (product.images.length + files.length > 8) return setFlash({ ok: false, text: 'A product can have up to 8 images.' });
+    const updated = await run(() => api.admin.uploadImages(product._id, files), 'Images uploaded.');
+    if (updated) onChange(updated);
   };
-  const bulk = (patch, label) => { sel.forEach((id) => upsert('products', { id, ...patch })); log(`${label} ${sel.length} product(s)`, user.name); setSel([]); };
-  const setSpec = (i, k, v) => setForm({ ...form, specifications: form.specifications.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
-  const moveSpec = (i, d) => { const a = [...form.specifications]; const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; setForm({ ...form, specifications: a }); };
+  const remove = async (img) => {
+    const updated = await run(() => api.admin.deleteImage(product._id, img._id), 'Image removed.');
+    if (updated) onChange(updated);
+  };
+  const makeMain = async (img) => {
+    const order = [img._id, ...product.images.filter((i) => i._id !== img._id).map((i) => i._id)];
+    const updated = await run(() => api.admin.reorderImages(product._id, order), 'Main image changed.');
+    if (updated) onChange(updated);
+  };
 
   return (
     <>
-      <Head title="Products" sub={`${db.products.length} products, ${db.products.filter((p) => p.status === 'draft').length} drafts, ${db.products.filter((p) => p.stock <= low).length} low or out of stock.`}>
-        <button className="btn btn-ghost btn-sm" onClick={() => exportCSV('products.csv', rows, [['Model', 'model'], ['Name', 'name'], ['Category', (p) => catName(p.category)], ['Subcategory', 'subcategory'], ['Price', 'price'], ['MRP', 'mrp'], ['Stock', 'stock'], ['Status', 'status']])}>Export CSV</button>
-        <button className="btn btn-primary btn-sm" onClick={() => { setForm({ ...BLANK, category: db.categories[0]?.slug || '' }); setError(''); }}>Add product</button>
+      <h3>Images</h3>
+      <Flash flash={flash} />
+      <div className="ad-images">
+        {product.images.map((img, i) => (
+          <figure key={img._id}>
+            <img src={productImage(img.url)} alt="" />
+            <figcaption>
+              {i === 0 ? <Pill value="Main" tone="ok" /> : <button className="auth__link" disabled={busy} onClick={() => makeMain(img)}>Make main</button>}
+              <button className="auth__link ad-danger" disabled={busy} onClick={() => remove(img)}>Remove</button>
+            </figcaption>
+          </figure>
+        ))}
+        {product.images.length === 0 && <p className="muted">No images yet.</p>}
+      </div>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={upload} aria-label="Choose product images" />
+      <button className="btn btn-ghost btn-sm" disabled={busy || product.images.length >= 8} onClick={() => input.current.click()}>{busy ? 'Working…' : 'Upload images'}</button>
+      <small className="muted">JPG, PNG or WebP, up to {MAX_IMAGE_MB} MB each, 8 per product. The first image is the main photo.</small>
+    </>
+  );
+}
+
+function Editor({ initial, categories, onClose, onSaved }) {
+  const [product, setProduct] = useState(initial);
+  const [f, setF] = useState(() => toForm(initial));
+  const { run, busy, flash, setFlash } = useAction();
+  const category = categories.find((c) => c._id === f.category);
+
+  const save = async () => {
+    const problem = validate(f);
+    if (problem) return setFlash({ ok: false, text: problem });
+    const saved = await run(
+      () => (product ? api.admin.updateProduct(product._id, toPayload(f)) : api.admin.createProduct(toPayload(f))),
+      product ? 'Product saved.' : 'Product created. You can now add images.'
+    );
+    if (saved) { setProduct(saved); setF(toForm(saved)); onSaved(); }
+  };
+  const setSpec = (i, k, v) => setF({ ...f, specs: f.specs.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
+  const moveSpec = (i, d) => {
+    const specs = [...f.specs]; const j = i + d;
+    if (j < 0 || j >= specs.length) return;
+    [specs[i], specs[j]] = [specs[j], specs[i]]; setF({ ...f, specs });
+  };
+
+  return (
+    <Drawer wide title={product ? `Edit ${product.model || product.name}` : 'Add a product'} onClose={onClose}
+      footer={<><Flash flash={flash} /><button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button><button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy ? 'Saving…' : product ? 'Save changes' : 'Create product'}</button></>}>
+      <h3>Basics</h3>
+      <div className="ad-form">
+        <Text label="Model number" f={f} set={setF} k="model" maxLength={100} hint="Shown as the headline, e.g. EGN 1500 C4" />
+        <Text label="Product name" f={f} set={setF} k="name" maxLength={200} required />
+        <Text label="Brand" f={f} set={setF} k="brand" maxLength={100} />
+        <Text label="SKU (optional)" f={f} set={setF} k="sku" maxLength={60} />
+        <Select label="Category" f={f} set={setF} k="category" options={[['', 'Choose a category'], ...categories.map((c) => [c._id, c.isActive ? c.name : `${c.name} (hidden)`])]} />
+        <F2 label="Product type">
+          {(id) => (
+            <>
+              <input id={id} className="input" list={`${id}-subs`} value={f.subcategory} maxLength={100} onChange={(e) => setF({ ...f, subcategory: e.target.value })} />
+              <datalist id={`${id}-subs`}>{(category?.subcategories || []).map((s) => <option key={s} value={s} />)}</datalist>
+            </>
+          )}
+        </F2>
+        <Area label="Description" f={f} set={setF} k="description" rows={3} />
+      </div>
+
+      <h3>Price and stock</h3>
+      <div className="ad-form">
+        <Num label="Selling price (₹)" f={f} set={setF} k="price" min={0} />
+        <Num label="MRP (₹)" f={f} set={setF} k="mrp" min={0} hint="Leave equal to the price if there is no discount" />
+        <Num label="Stock (units)" f={f} set={setF} k="stock" min={0} step={1} />
+        <Num label="Warranty (months)" f={f} set={setF} k="warrantyMonths" min={0} step={1} />
+        <Check label="Active: visible and orderable on the store" f={f} set={setF} k="isActive" />
+        <Check label="Featured on the home page" f={f} set={setF} k="isFeatured" />
+      </div>
+      {product?.priceSource && product.priceSource !== 'confirmed' && (
+        <p className="acct__warn">This price was imported as a reference price and has not been confirmed. Saving a new price marks it as confirmed.</p>
+      )}
+
+      <h3>Specifications</h3>
+      <div className="ad-specs">
+        {f.specs.map((s, i) => (
+          <div key={i}>
+            <input className="input" placeholder="Label, e.g. Capacity" aria-label={`Specification ${i + 1} label`} value={s.key} maxLength={100} onChange={(e) => setSpec(i, 'key', e.target.value)} />
+            <input className="input" placeholder="Value, e.g. 1300 L" aria-label={`Specification ${i + 1} value`} value={s.value} maxLength={300} onChange={(e) => setSpec(i, 'value', e.target.value)} />
+            <button onClick={() => moveSpec(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+            <button onClick={() => moveSpec(i, 1)} disabled={i === f.specs.length - 1} aria-label="Move down">↓</button>
+            <button onClick={() => setF({ ...f, specs: f.specs.filter((_, j) => j !== i) })} aria-label="Remove specification">×</button>
+          </div>
+        ))}
+        <button className="btn btn-ghost btn-sm" onClick={() => setF({ ...f, specs: [...f.specs, { key: '', value: '' }] })}>Add a specification</button>
+      </div>
+      <div className="ad-form">
+        <Area label="Key features (one per line)" f={f} set={setF} k="features" rows={4} />
+        <Area label="Applications (one per line)" f={f} set={setF} k="applications" rows={2} />
+        <Text label="Badges (comma separated)" f={f} set={setF} k="badges" wide hint="Short tags shown on the product card, e.g. Frost Free, SS 304" />
+      </div>
+
+      <h3>Used by the storefront filters</h3>
+      <div className="ad-form">
+        <Num label="Minimum temperature (°C)" f={f} set={setF} k="tempMin" />
+        <Num label="Maximum temperature (°C)" f={f} set={setF} k="tempMax" />
+        <Select label="Temperature class" f={f} set={setF} k="tempClass" options={TEMP_CLASSES.map((t) => [t, t || 'Not applicable'])} />
+        <Num label="Capacity (litres)" f={f} set={setF} k="capacityL" min={0} />
+        <Text label="Refrigerant" f={f} set={setF} k="refrigerant" maxLength={40} />
+        <Text label="Cooling type" f={f} set={setF} k="cooling" maxLength={100} />
+        <Text label="Series ID" f={f} set={setF} k="familyId" maxLength={100} hint="Products with the same series ID are listed as variants of each other" />
+        <Num label="Sort order" f={f} set={setF} k="sortOrder" step={1} hint="Lower numbers appear first" />
+      </div>
+
+      {product ? <Images product={product} onChange={(p) => { setProduct(p); onSaved(); }} /> : <p className="muted">Create the product first, then add its images.</p>}
+    </Drawer>
+  );
+}
+
+// Same field wrapper as ui.jsx's F, for a custom control
+let fid = 0;
+function F2({ label, children }) {
+  const [id] = useState(() => `adp-${++fid}`);
+  return <div className="field"><label htmlFor={id}>{label}</label>{children(id)}</div>;
+}
+
+export default function ProductsAdmin() {
+  const { reloadCatalogue, settings } = useApp();
+  const list = useList(api.admin.products, { sort: 'newest' });
+  const { data: categories } = useAsync(() => api.admin.categories(), []);
+  const [editing, setEditing] = useState(undefined); // undefined closed, null new, object edit
+  const { run, busy, flash } = useAction();
+
+  // The storefront reads the catalogue once per visit: refresh it after a change
+  const changed = () => { list.reload(); reloadCatalogue(); };
+
+  const setStock = async (p, stock) => {
+    if (stock < 0) return;
+    const updated = await run(() => api.admin.setStock(p._id, stock));
+    if (updated) { list.patch(p._id, { stock: updated.stock }); reloadCatalogue(); }
+  };
+  const toggle = async (p) => {
+    const updated = await run(() => api.admin.toggleProduct(p._id), (u) => `${p.model || p.name} is now ${u.isActive ? 'active' : 'hidden'}.`);
+    if (updated) { list.patch(p._id, { isActive: updated.isActive }); reloadCatalogue(); }
+  };
+  const remove = async (p) => {
+    if (!window.confirm(`Delete ${p.model || p.name}? Products that have orders are archived (hidden) instead of deleted.`)) return;
+    const res = await run(() => api.admin.deleteProduct(p._id), (r) => r.message);
+    if (res) changed();
+  };
+  const stockTone = (p) => (p.stock === 0 ? 'out' : p.stock <= (settings.lowStockThreshold ?? 3) ? 'low' : 'ok');
+
+  return (
+    <>
+      <Head title="Products & stock" sub="Everything on sale, with its price and stock.">
+        <button className="btn btn-primary btn-sm" onClick={() => setEditing(null)}>Add product</button>
       </Head>
+      <Flash flash={flash} />
 
       <div className="ad-toolbar">
-        <input className="input" type="search" placeholder="Search model, name or type" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search products" />
-        <select className="select" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category"><option value="">All categories</option>{db.categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select>
-        <select className="select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="">All statuses</option><option value="active">Active</option><option value="draft">Draft</option><option value="featured">Featured</option><option value="low">Low or out of stock</option></select>
-        <select className="select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="newest">Newest first</option><option value="model">Model A to Z</option><option value="priceAsc">Price low to high</option><option value="priceDesc">Price high to low</option><option value="stock">Stock low to high</option></select>
+        <input className="input" type="search" placeholder="Search by model, name or SKU" aria-label="Search products" value={list.search} onChange={(e) => list.setSearch(e.target.value)} />
+        <select className="select" aria-label="Category" value={list.query.category || ''} onChange={(e) => list.setFilter('category', e.target.value)}>
+          <option value="">All categories</option>
+          {(categories || []).map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+        </select>
+        <select className="select" aria-label="Status" value={list.query.isActive ?? ''} onChange={(e) => list.setFilter('isActive', e.target.value)}>
+          <option value="">Active and hidden</option><option value="true">Active</option><option value="false">Hidden</option>
+        </select>
+        <select className="select" aria-label="Stock level" value={list.query.stockStatus || ''} onChange={(e) => list.setFilter('stockStatus', e.target.value)}>
+          <option value="">Any stock level</option><option value="in">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option>
+        </select>
+        <select className="select" aria-label="Sort" value={list.query.sort} onChange={(e) => list.setFilter('sort', e.target.value)}>
+          <option value="newest">Newest first</option><option value="name">Model, A to Z</option><option value="stock_asc">Stock, low to high</option>
+          <option value="price_asc">Price, low to high</option><option value="price_desc">Price, high to low</option><option value="popular">Best selling</option>
+        </select>
       </div>
-      {sel.length > 0 && (
-        <div className="ad-bulk"><strong>{sel.length} selected</strong>
-          <button className="btn btn-ghost btn-sm" onClick={() => bulk({ status: 'active' }, 'activated')}>Set active</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => bulk({ status: 'draft' }, 'drafted')}>Set draft</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => bulk({ featured: true }, 'featured')}>Feature</button>
-          <button className="btn btn-ghost btn-sm ad-danger" onClick={() => del(sel)}>Delete</button>
-        </div>
-      )}
 
-      {rows.length === 0 ? <Empty>No products match. Clear the search or filters, or add a product.</Empty> : (
-        <div className="ad-tablewrap"><table className="ad-table">
-          <thead><tr>
-            <th><input type="checkbox" aria-label="Select all on page" checked={pg.slice.every((p) => sel.includes(p.id))} onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...pg.slice.map((p) => p.id)])] : sel.filter((id) => !pg.slice.some((p) => p.id === id)))} /></th>
-            <th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
-          </tr></thead>
-          <tbody>{pg.slice.map((p) => (
-            <tr key={p.id}>
-              <td><input type="checkbox" aria-label={`Select ${p.model}`} checked={sel.includes(p.id)} onChange={() => setSel(sel.includes(p.id) ? sel.filter((x) => x !== p.id) : [...sel, p.id])} /></td>
-              <td><div className="ad-prod"><img src={productImage(p.image)} alt="" /><div><strong>{p.model}</strong>{p.featured && <span className="pill pill--confirmed">Featured</span>}<small>{p.name}</small></div></div></td>
-              <td>{catName(p.category)}<small>{p.subcategory}</small></td>
-              <td className="num">{fmtPrice(p.price)}{p.mrp > p.price && <small><s>{fmtPrice(p.mrp)}</s></small>}</td>
-              <td>
-                <div className="ad-stock">
-                  <button aria-label={`Decrease stock of ${p.model}`} onClick={() => upsert('products', { id: p.id, stock: Math.max(0, p.stock - 1) })}>−</button>
-                  <span className="num">{p.stock}</span>
-                  <button aria-label={`Increase stock of ${p.model}`} onClick={() => upsert('products', { id: p.id, stock: p.stock + 1 })}>+</button>
-                </div>
-                {p.stock === 0 ? <Pill value="Out of stock" /> : p.stock <= low ? <Pill value="Low stock" /> : null}
-              </td>
-              <td><button className="ad-toggle" onClick={() => upsert('products', { id: p.id, status: p.status === 'draft' ? 'active' : 'draft' })} title="Toggle active / draft"><Pill value={p.status === 'draft' ? 'Draft' : 'Active'} /></button></td>
-              <td className="ad-actions">
-                <button onClick={() => { setForm(toForm(p)); setError(''); }}>Edit</button>
-                <button onClick={() => { const { id, ...copy } = toForm(p); setForm({ ...copy, model: `${p.model} Copy`, createdAt: '' }); setError(''); }}>Duplicate</button>
-                <a href={`/product/${p.id}`} target="_blank" rel="noreferrer">View</a>
-                <button className="ad-danger" onClick={() => del([p.id])}>Delete</button>
-              </td>
-            </tr>
-          ))}</tbody>
-        </table></div>
-      )}
-      <Pager {...pg} onPage={pg.setPage} />
-
-      {form && (
-        <Drawer wide title={form.id ? `Edit ${form.model}` : 'Add product'} onClose={() => setForm(null)}
-          footer={<>{error && <p className="field-error" role="alert">{error}</p>}<button className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button><button className="btn btn-primary btn-sm" onClick={save}>Save product</button></>}>
-          <h3>Basics</h3>
-          <div className="ad-form">
-            <Text label="Model number" f={form} set={setForm} k="model" />
-            <Text label="Product name" f={form} set={setForm} k="name" />
-            <Select label="Category" f={form} set={(v) => setForm({ ...v, subcategory: '' })} k="category" options={[['', 'Choose category'], ...db.categories.map((c) => [c.slug, c.name])]} />
-            <Select label="Subcategory" f={form} set={setForm} k="subcategory" options={[['', subs.length ? 'Choose subcategory' : 'General'], ...subs]} />
-            <Area label="Description" f={form} set={setForm} k="description" />
-          </div>
-          <h3>Pricing and inventory</h3>
-          <div className="ad-form">
-            <Num label="Price (₹)" f={form} set={setForm} k="price" min="0" />
-            <Num label="MRP (₹, optional)" f={form} set={setForm} k="mrp" min="0" hint="Shown struck through in the admin list." />
-            <Select label="Price type" f={form} set={setForm} k="priceSource" options={[['indicative', 'Indicative demo price'], ['listed', 'Marketplace listed price']]} />
-            <Num label="Stock quantity" f={form} set={setForm} k="stock" min="0" />
-            <Select label="Status" f={form} set={setForm} k="status" options={[['active', 'Active (visible on site)'], ['draft', 'Draft (hidden)']]} />
-            <div className="field"><span className="ad-label">Merchandising</span><Check label="Featured product" f={form} set={setForm} k="featured" /></div>
-          </div>
-          <h3>Images</h3>
-          <div className="ad-form">
-            <Text wide label="Main image" f={form} set={setForm} k="image" hint="A full https:// image URL, or the name of a file in public/images/products (without .webp). Empty uses the category image." />
-            {form.image && <div className="ad-preview ad-wide"><img src={productImage(form.image)} alt="Preview" /></div>}
-            <Area label="Gallery images (one per line)" f={form} set={setForm} k="galleryText" rows={2} />
-          </div>
-          <h3>Technical specifications</h3>
-          <div className="ad-specs">
-            {form.specifications.map((s, i) => (
-              <div key={i}>
-                <input className="input" placeholder="Label, e.g. Capacity" aria-label={`Specification ${i + 1} label`} value={s.label} onChange={(e) => setSpec(i, 'label', e.target.value)} />
-                <input className="input" placeholder="Value, e.g. 1300 L" aria-label={`Specification ${i + 1} value`} value={s.value} onChange={(e) => setSpec(i, 'value', e.target.value)} />
-                <button aria-label="Move up" onClick={() => moveSpec(i, -1)}>↑</button>
-                <button aria-label="Move down" onClick={() => moveSpec(i, 1)}>↓</button>
-                <button aria-label="Remove row" className="ad-danger" onClick={() => setForm({ ...form, specifications: form.specifications.filter((_, j) => j !== i) })}>×</button>
-              </div>
+      <div className="ad-tablewrap">
+        <table className="ad-table">
+          <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+          <tbody>
+            <ListState list={list} cols={6} empty="No products match. Clear the filters or add a product." />
+            {list.items.map((p) => (
+              <tr key={p._id}>
+                <td>
+                  <div className="ad-prod">
+                    <img src={productImage(p.images?.[0]?.url)} alt="" loading="lazy" />
+                    <div><strong>{p.model || p.name}</strong>{p.isFeatured && <Pill value="Featured" tone="confirmed" />}<small>{p.model ? p.name : p.sku}</small></div>
+                  </div>
+                </td>
+                <td>{p.category?.name}<small>{p.subcategory}</small></td>
+                <td className="num">{fmtPrice(p.price)}{p.priceSource !== 'confirmed' && <small>Not confirmed</small>}</td>
+                <td>
+                  <span className="ad-stock">
+                    <button onClick={() => setStock(p, p.stock - 1)} disabled={busy || p.stock === 0} aria-label={`Remove one ${p.model || p.name} from stock`}>−</button>
+                    <span className="num">{p.stock}</span>
+                    <button onClick={() => setStock(p, p.stock + 1)} disabled={busy} aria-label={`Add one ${p.model || p.name} to stock`}>+</button>
+                  </span>
+                  <Pill value={p.stock === 0 ? 'Out' : stockTone(p) === 'low' ? 'Low' : 'In stock'} tone={stockTone(p)} />
+                </td>
+                <td><button className="ad-toggle" onClick={() => toggle(p)} disabled={busy} title="Click to change"><Pill value={p.isActive ? 'Active' : 'Hidden'} tone={p.isActive ? 'active' : 'draft'} /></button></td>
+                <td className="ad-actions">
+                  <button onClick={() => setEditing(p)}>Edit</button>
+                  {p.isActive && <a href={`/product/${p.slug}`} target="_blank" rel="noreferrer">View</a>}
+                  <button className="ad-danger" onClick={() => remove(p)} disabled={busy}>Delete</button>
+                </td>
+              </tr>
             ))}
-            <button className="btn btn-ghost btn-sm" onClick={() => setForm({ ...form, specifications: [...form.specifications, { label: '', value: '' }] })}>Add specification row</button>
-          </div>
-          <h3>Filters and temperature scale</h3>
-          <div className="ad-form">
-            <Num label="Min temperature (°C)" f={form} set={setForm} k="tMin" hint="Leave both empty if not applicable." />
-            <Num label="Max temperature (°C)" f={form} set={setForm} k="tMax" />
-            <Num label="Capacity (litres)" f={form} set={setForm} k="capacityL" min="0" />
-            <Text label="Refrigerant" f={form} set={setForm} k="refrigerant" placeholder="e.g. R290" />
-            <Text label="Cooling type" f={form} set={setForm} k="cooling" placeholder="e.g. Ventilated cooling" />
-          </div>
-          <h3>Content</h3>
-          <div className="ad-form">
-            <Area label="Key features (one per line)" f={form} set={setForm} k="featuresText" rows={5} />
-            <Text wide label="Badges (comma separated)" f={form} set={setForm} k="badgesText" placeholder="SS 304, Frost Free" />
-            <Text wide label="Applications (comma separated)" f={form} set={setForm} k="applicationsText" placeholder="Hotels & Restaurants, Dairy" />
-          </div>
-        </Drawer>
-      )}
+          </tbody>
+        </table>
+      </div>
+      <ServerPager list={list} />
+
+      {editing !== undefined && <Editor initial={editing} categories={categories || []} onClose={() => setEditing(undefined)} onSaved={changed} />}
     </>
   );
 }

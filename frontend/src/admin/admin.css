@@ -154,3 +154,14 @@
   .ad-drawer__panel { width: 100% !important; }
   .ad-drawer__body { overflow: visible; }
 }
+
+.ad-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.6rem; }
+.ad-images figure { margin: 0; background: var(--tile); border-radius: var(--r-1); padding: 0.4rem; display: grid; gap: 0.35rem; }
+.ad-images img { width: 100%; aspect-ratio: 1; object-fit: contain; }
+.ad-images figcaption { display: flex; justify-content: space-between; align-items: center; gap: 0.3rem; font-size: 0.75rem; }
+.ad-flash { margin-right: auto; }
+.ad-drawer__panel > footer .acct__msg { margin-right: auto; padding: 0.35rem 0.6rem; font-size: var(--fs-0); }
+.ad-toggle[disabled] { opacity: 0.6; cursor: progress; }
+.ad-specs > div button[disabled] { opacity: 0.3; cursor: default; }
+.ad-side { overflow-x: hidden; }
+.ad-side__logo, .ad-login__logo { font-size: 1.15rem; flex-wrap: wrap; }

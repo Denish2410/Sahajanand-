@@ -1,118 +1,130 @@
 import { Link } from '../router/index.jsx';
-import { useApp } from '../context/AppContext.jsx';
-import { ORDER_STATUSES } from '../services/store.js';
-import { fmtPrice, fmtDate, fmtDateTime } from '../utils/format.js';
+import { useAsync } from '../hooks/useAsync.js';
+import { api } from '../services/api.js';
+import { ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL } from '../services/mappers.js';
+import { fmtPrice, fmtDateTime } from '../utils/format.js';
+import { Loading, ErrorState } from '../components/State/State.jsx';
 import { Head, Pill } from './ui.jsx';
 
-export default function Dashboard() {
-  const { db, user } = useApp();
-  const { orders, enquiries, products, users, coupons, settings, categories, activity } = db;
-  const live = orders.filter((o) => o.status !== 'Cancelled');
-  const revenue = live.reduce((s, o) => s + o.total, 0);
-  const paid = orders.filter((o) => o.paymentStatus === 'Paid').reduce((s, o) => s + o.total, 0);
-  const pending = orders.filter((o) => ['Placed', 'Confirmed'].includes(o.status)).length;
-  const newEnq = enquiries.filter((e) => e.status === 'New').length;
-  const customers = users.filter((u) => u.role === 'customer');
-  const low = products.filter((p) => (p.stock ?? 0) <= settings.lowStockThreshold).sort((a, b) => a.stock - b.stock);
-  const stockValue = products.reduce((s, p) => s + p.price * (p.stock ?? 0), 0);
+const dayLabel = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' });
 
-  // Revenue for the last 7 days.
-  const days = [...Array(7)].map((_, i) => {
+// The last 7 calendar days, including days with no sales
+function lastSevenDays(rows) {
+  const byDay = new Map(rows.map((r) => [r._id, r]));
+  return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(Date.now() - (6 - i) * 864e5);
-    const key = d.toISOString().slice(0, 10);
-    return { label: d.toLocaleDateString('en-IN', { weekday: 'short' }), total: live.filter((o) => o.createdAt.slice(0, 10) === key).reduce((s, o) => s + o.total, 0) };
+    const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+    return { key, revenue: byDay.get(key)?.revenue || 0, orders: byDay.get(key)?.orders || 0 };
   });
-  const maxDay = Math.max(...days.map((d) => d.total), 1);
-  const byStatus = ORDER_STATUSES.map((s) => ({ s, n: orders.filter((o) => o.status === s).length }));
-  const maxStatus = Math.max(...byStatus.map((x) => x.n), 1);
+}
 
-  // Best sellers by units ordered.
-  const units = {};
-  for (const o of live) for (const i of o.items) units[i.model] = (units[i.model] || 0) + i.qty;
-  const best = Object.entries(units).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const catSales = categories.map((c) => ({ name: c.name, total: live.reduce((s, o) => s + o.items.filter((i) => i.category === c.slug).reduce((x, i) => x + i.price * i.qty, 0), 0) }));
-  const maxCat = Math.max(...catSales.map((c) => c.total), 1);
+export default function Dashboard() {
+  const { data: d, loading, error, reload } = useAsync(() => api.admin.dashboard(), []);
 
-  const kpis = [
-    ['Revenue (excl. cancelled)', fmtPrice(revenue), `${fmtPrice(paid)} received`, '/admin/orders'],
-    ['Orders', orders.length, `${pending} awaiting action`, '/admin/orders'],
-    ['Enquiries', enquiries.length, `${newEnq} new`, '/admin/enquiries'],
-    ['Customers', customers.length, `${customers.filter((c) => c.status === 'blocked').length} blocked`, '/admin/customers'],
-    ['Products', products.length, `${products.filter((p) => p.status === 'draft').length} drafts`, '/admin/products'],
-    ['Stock value', fmtPrice(stockValue), `${low.length} low or out of stock`, '/admin/products'],
-    ['Active coupons', coupons.filter((c) => c.active).length, `${coupons.reduce((s, c) => s + (c.used || 0), 0)} redemptions`, '/admin/coupons'],
-    ['Average order', fmtPrice(live.length ? Math.round(revenue / live.length) : 0), `${live.length} completed or open`, '/admin/orders'],
-  ];
+  if (loading && !d) return <><Head title="Dashboard" /><Loading label="Loading the dashboard" /></>;
+  if (error && !d) return <><Head title="Dashboard" /><ErrorState error={error} onRetry={reload} /></>;
+
+  const week = lastSevenDays(d.revenueDaily7);
+  const peak = Math.max(1, ...week.map((x) => x.revenue));
+  const statusMax = Math.max(1, ...Object.values(d.ordersByStatus));
+  const kpi = (label, value, note, to) => (
+    <Link to={to} className="ad-kpi"><span>{label}</span><strong className="num">{value}</strong><small>{note}</small></Link>
+  );
 
   return (
     <>
-      <Head title="Dashboard" sub={`Signed in as ${user.name}. Everything below updates as you work in the panel.`}>
-        <Link to="/" className="btn btn-ghost btn-sm">View storefront</Link>
+      <Head title="Dashboard" sub="How the store is doing right now.">
+        <button className="btn btn-ghost btn-sm" onClick={reload} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
       </Head>
 
-      <div className="ad-kpis">
-        {kpis.map(([label, value, note, to]) => (
-          <Link key={label} to={to} className="ad-kpi"><span>{label}</span><strong className="num">{value}</strong><small>{note}</small></Link>
-        ))}
-      </div>
+      {(d.needsAttention > 0 || d.refundsPending > 0) && (
+        <p className="acct__warn" role="status">
+          {d.needsAttention > 0 && <><strong>{d.needsAttention}</strong> paid {d.needsAttention === 1 ? 'order needs' : 'orders need'} attention (stock ran out after payment). </>}
+          {d.refundsPending > 0 && <><strong>{d.refundsPending}</strong> {d.refundsPending === 1 ? 'refund is' : 'refunds are'} waiting to be processed. </>}
+          <Link to="/admin/orders" className="auth__link">Review orders</Link>
+        </p>
+      )}
 
-      <div className="ad-cols">
-        <section className="ad-card">
-          <h2>Revenue, last 7 days</h2>
-          <div className="ad-bars">
-            {days.map((d, i) => (
-              <div key={i} title={fmtPrice(d.total)}>
-                <span className="ad-bars__val num">{d.total ? `${Math.round(d.total / 1000)}k` : ''}</span>
-                <span className="ad-bars__bar" style={{ height: `${(d.total / maxDay) * 100}%` }} />
-                <span className="ad-bars__label">{d.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="ad-card">
-          <h2>Orders by status</h2>
-          <ul className="ad-hbars">
-            {byStatus.map(({ s, n }) => <li key={s}><span>{s}</span><i style={{ width: `${(n / maxStatus) * 100}%` }} /><b className="num">{n}</b></li>)}
-          </ul>
-        </section>
-        <section className="ad-card">
-          <h2>Sales by category</h2>
-          <ul className="ad-hbars">
-            {catSales.map((c) => <li key={c.name}><span>{c.name}</span><i style={{ width: `${(c.total / maxCat) * 100}%` }} /><b className="num">{fmtPrice(c.total)}</b></li>)}
-          </ul>
-        </section>
+      <div className="ad-kpis">
+        {kpi('Revenue (paid orders)', fmtPrice(d.totalRevenue), `${fmtPrice(d.todayRevenue)} today`, '/admin/orders')}
+        {kpi('Orders', d.totalOrders, `${d.todayOrders} today`, '/admin/orders')}
+        {kpi('Pending orders', d.pendingOrders, 'Placed or confirmed, not yet dispatched', '/admin/orders')}
+        {kpi('Completed orders', d.completedOrders, `${d.cancelledOrders} cancelled`, '/admin/orders')}
+        {kpi('Products', d.totalProducts, `${d.activeProducts} active on the store`, '/admin/products')}
+        {kpi('Out of stock', d.outOfStockCount, `${d.lowStockCount} low (≤ ${d.lowStockThreshold})`, '/admin/products')}
+        {kpi('Customers', d.totalCustomers, `${d.newCustomers} new in 30 days`, '/admin/customers')}
+        {kpi('New enquiries', d.newEnquiries, 'Quote requests to answer', '/admin/enquiries')}
       </div>
 
       <div className="ad-cols ad-cols--2">
         <section className="ad-card">
-          <h2>Recent orders <Link to="/admin/orders">View all</Link></h2>
-          <table className="ad-table ad-table--plain"><tbody>
-            {orders.slice(0, 6).map((o) => <tr key={o.id}><td className="num"><Link to={`/admin/orders?open=${o.id}`}>{o.id}</Link></td><td>{o.customer.name}</td><td>{fmtDate(o.createdAt)}</td><td className="num">{fmtPrice(o.total)}</td><td><Pill value={o.status} /></td></tr>)}
-          </tbody></table>
+          <h2>Revenue, last 7 days</h2>
+          <div className="ad-bars" role="img" aria-label={`Revenue per day for the last 7 days: ${week.map((x) => `${dayLabel(x.key)} ${fmtPrice(x.revenue)}`).join(', ')}`}>
+            {week.map((x) => (
+              <div key={x.key}>
+                <span className="ad-bars__val num">{x.revenue ? fmtPrice(x.revenue) : ''}</span>
+                <i className="ad-bars__bar" style={{ height: `${(x.revenue / peak) * 100}%` }} />
+                <span className="ad-bars__label">{dayLabel(x.key)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="muted" style={{ fontSize: 'var(--fs-0)' }}>Counts orders whose payment has been received.</p>
         </section>
+
         <section className="ad-card">
-          <h2>Recent enquiries <Link to="/admin/enquiries">View all</Link></h2>
-          <table className="ad-table ad-table--plain"><tbody>
-            {enquiries.slice(0, 6).map((e) => <tr key={e.id}><td className="num">{e.reference}</td><td>{e.name}</td><td>{e.product || 'General'}</td><td>{fmtDate(e.createdAt)}</td><td><Pill value={e.status} /></td></tr>)}
-          </tbody></table>
+          <h2>Orders by status</h2>
+          <ul className="ad-hbars">
+            {Object.entries(d.ordersByStatus).map(([status, count]) => (
+              <li key={status}><span>{ORDER_STATUS_LABEL[status] || status}</span><i style={{ width: `${(count / statusMax) * 100}%` }} /><strong className="num">{count}</strong></li>
+            ))}
+          </ul>
         </section>
-        <section className="ad-card">
-          <h2>Low stock <Link to="/admin/products">Manage</Link></h2>
-          {low.length === 0 ? <p className="muted">All products are above the threshold of {settings.lowStockThreshold}.</p> : (
-            <table className="ad-table ad-table--plain"><tbody>
-              {low.slice(0, 6).map((p) => <tr key={p.id}><td><strong>{p.model}</strong></td><td>{p.name}</td><td><Pill value={p.stock === 0 ? 'Out of stock' : `${p.stock} left`} tone={p.stock === 0 ? 'out' : 'low'} /></td></tr>)}
-            </tbody></table>
+
+        <section className="ad-card ad-card--wide">
+          <h2>Recent orders <Link to="/admin/orders">All orders</Link></h2>
+          {d.recentOrders.length === 0 ? <p className="muted">No orders yet.</p> : (
+            <table className="ad-table ad-table--plain">
+              <thead><tr><th>Order</th><th>Customer</th><th>Placed</th><th>Total</th><th>Status</th><th>Payment</th></tr></thead>
+              <tbody>
+                {d.recentOrders.map((o) => (
+                  <tr key={o._id}>
+                    <td className="num"><Link to="/admin/orders">{o.orderNumber}</Link></td>
+                    <td>{o.user?.name || o.shippingAddress?.fullName}</td>
+                    <td>{fmtDateTime(o.createdAt)}</td>
+                    <td className="num">{fmtPrice(o.totalAmount)}</td>
+                    <td><Pill value={ORDER_STATUS_LABEL[o.orderStatus]} tone={o.orderStatus} /></td>
+                    <td><Pill value={PAYMENT_STATUS_LABEL[o.paymentStatus]} tone={o.paymentStatus} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </section>
+
+        <section className="ad-card">
+          <h2>Low stock <Link to="/admin/products">Manage stock</Link></h2>
+          {d.lowStockProducts.length === 0 ? <p className="muted">Nothing is running low.</p> : (
+            <table className="ad-table ad-table--plain">
+              <tbody>
+                {d.lowStockProducts.map((p) => (
+                  <tr key={p._id}><td><strong>{p.model || p.name}</strong><small>{p.model ? p.name : p.sku}</small></td><td className="num"><Pill value={`${p.stock} left`} tone="low" /></td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
         <section className="ad-card">
           <h2>Best sellers</h2>
-          {best.length === 0 ? <p className="muted">No orders yet.</p> : (
-            <table className="ad-table ad-table--plain"><tbody>{best.map(([m, n]) => <tr key={m}><td><strong>{m}</strong></td><td className="num">{n} units ordered</td></tr>)}</tbody></table>
+          {d.topSellingProducts.length === 0 ? <p className="muted">No sales yet.</p> : (
+            <table className="ad-table ad-table--plain">
+              <tbody>
+                {d.topSellingProducts.map((p) => (
+                  <tr key={p._id}><td><strong>{p.model || p.name}</strong>{p.model && <small>{p.name}</small>}</td><td className="num">{p.totalSold} sold</td><td className="num">{fmtPrice(p.totalRevenue)}</td></tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </section>
-        <section className="ad-card ad-card--wide">
-          <h2>Recent activity <Link to="/admin/activity">Full log</Link></h2>
-          <ul className="ad-log">{activity.slice(0, 6).map((a) => <li key={a.id}><time>{fmtDateTime(a.at)}</time><span><strong>{a.by}</strong> {a.action}</span></li>)}</ul>
         </section>
       </div>
     </>
