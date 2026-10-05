@@ -67,92 +67,56 @@ async function verifyPayment(userId, body) {
 }
 
 /**
+ * A payment arrived for an order that is (or just became) cancelled: keep the
+ * order cancelled and flag the money for a refund.
+ */
+async function flagRefundAfterCancel(orderId) {
+  const order = await Order.findByIdAndUpdate(
+    orderId,
+    {
+      $set: { paymentStatus: 'refund_pending', needsAttention: true },
+      $push: {
+        statusHistory: {
+          status: 'cancelled',
+          note: 'ATTENTION: Payment received after cancellation. Refund required.',
+          at: new Date(),
+        },
+      },
+    },
+    { new: true }
+  );
+  sendAdminAlert(
+    `Refund Required — ${order.orderNumber}`,
+    `Order ${order.orderNumber} was paid after it had been cancelled. Amount: ₹${order.totalAmount}.`
+  ).catch(() => {});
+  return order;
+}
+
+/**
  * Finalize a paid order — shared by verify and webhook.
- * Safe to call twice (idempotent): if already paid, returns as-is.
+ * Idempotent and safe under concurrency: the move to "paid" is claimed
+ * atomically in the database, so when the browser's verification and
+ * Razorpay's webhook (or a repeated webhook) arrive together, only one of
+ * them takes stock and confirms the order.
  *
- * @param {object} order - Order document
+ * @param {object} order - Order document (only its _id is trusted)
  * @param {object} paymentDetails - { razorpayPaymentId, razorpaySignature? }
  * @returns {Promise<object>} Updated order
  */
 async function finalizePaidOrder(order, paymentDetails) {
-  // Idempotency: already paid
-  if (order.paymentStatus === 'paid') {
-    logger.info(`Order ${order.orderNumber} already marked as paid — skipping`);
-    return order;
+  const claimed = await Order.findOneAndUpdate(
+    { _id: order._id, paymentStatus: { $in: ['pending', 'failed'] } },
+    { $set: { paymentStatus: 'paid' } },
+    { new: true }
+  );
+
+  if (!claimed) {
+    logger.info(`Order ${order.orderNumber} payment already processed — skipping`);
+    return Order.findById(order._id);
   }
 
-  // A cancelled order that gets paid afterwards (late webhook) must not be
-  // revived: record the payment and flag it for a refund.
-  if (order.orderStatus === 'cancelled') {
-    order.paymentStatus = 'refund_pending';
-    order.needsAttention = true;
-    order.statusHistory.push({
-      status: 'cancelled',
-      note: 'ATTENTION: Payment received after cancellation. Refund required.',
-      at: new Date(),
-    });
-    await order.save();
-    await Payment.findOneAndUpdate(
-      { razorpayOrderId: order.razorpayOrderId },
-      { status: 'captured', razorpayPaymentId: paymentDetails.razorpayPaymentId }
-    );
-    sendAdminAlert(
-      `Refund Required — ${order.orderNumber}`,
-      `Order ${order.orderNumber} was paid after it had been cancelled. Amount: ₹${order.totalAmount}.`
-    ).catch(() => {});
-    return order;
-  }
-
-  let hasStockIssue = false;
-  const stockNotes = [];
-
-  // Take the items out of stock (all or nothing)
-  const shortItem = await orderService.deductStock(order);
-  if (shortItem) {
-    // Insufficient stock but payment is received — flag for admin
-    hasStockIssue = true;
-    stockNotes.push(`"${shortItem}" — insufficient stock`);
-    logger.warn(
-      `Order ${order.orderNumber}: insufficient stock for "${shortItem}" — paid order needs attention`
-    );
-  }
-
-  if (order.couponCode && !order.couponCounted) {
-    await couponService.recordCouponUse(order.couponCode, order.user);
-    order.couponCounted = true;
-  }
-
-  // Mark order as paid
-  order.paymentStatus = 'paid';
-  order.orderStatus = 'confirmed';
-  order.statusHistory.push({
-    status: 'confirmed',
-    note: 'Payment confirmed',
-    at: new Date(),
-  });
-
-  if (hasStockIssue) {
-    order.needsAttention = true;
-    order.notes = (order.notes ? order.notes + '\n' : '') +
-      'STOCK ISSUE: ' + stockNotes.join('; ');
-    order.statusHistory.push({
-      status: 'confirmed',
-      note: 'ATTENTION: Some items have insufficient stock. Manual resolution required.',
-      at: new Date(),
-    });
-
-    // Alert admin
-    sendAdminAlert(
-      `Stock Issue — ${order.orderNumber}`,
-      `Paid order ${order.orderNumber} has stock issues:\n${stockNotes.join('\n')}\n\nPlease resolve manually (fulfil or refund).`
-    ).catch(() => {});
-  }
-
-  await order.save();
-
-  // Update payment record
   await Payment.findOneAndUpdate(
-    { razorpayOrderId: order.razorpayOrderId },
+    { razorpayOrderId: claimed.razorpayOrderId },
     {
       status: 'captured',
       razorpayPaymentId: paymentDetails.razorpayPaymentId,
@@ -160,20 +124,68 @@ async function finalizePaidOrder(order, paymentDetails) {
     }
   );
 
+  // A cancelled order that gets paid afterwards must not be revived
+  if (claimed.orderStatus === 'cancelled') {
+    return flagRefundAfterCancel(claimed._id);
+  }
+
+  // Take the items out of stock (all or nothing)
+  const shortItem = await orderService.deductStock(claimed);
+  const stockTaken = !shortItem;
+
+  let couponCounted = claimed.couponCounted;
+  if (claimed.couponCode && !couponCounted) {
+    await couponService.recordCouponUse(claimed.couponCode, claimed.user);
+    couponCounted = true;
+  }
+
+  const set = { orderStatus: 'confirmed', stockDeducted: stockTaken, couponCounted };
+  const history = [{ status: 'confirmed', note: 'Payment confirmed', at: new Date() }];
+
+  if (shortItem) {
+    // Insufficient stock but payment is received — flag for admin
+    logger.warn(
+      `Order ${claimed.orderNumber}: insufficient stock for "${shortItem}" — paid order needs attention`
+    );
+    set.needsAttention = true;
+    set.internalNotes = `${claimed.internalNotes ? claimed.internalNotes + '\n' : ''}STOCK ISSUE: "${shortItem}" — insufficient stock when the payment arrived`;
+    history.push({
+      status: 'confirmed',
+      note: 'ATTENTION: Some items have insufficient stock. Manual resolution required.',
+      at: new Date(),
+    });
+    sendAdminAlert(
+      `Stock Issue — ${claimed.orderNumber}`,
+      `Paid order ${claimed.orderNumber} has a stock issue: "${shortItem}" — insufficient stock. Please resolve manually (fulfil or refund).`
+    ).catch(() => {});
+  }
+
+  // Confirm, unless the order was cancelled while we were working
+  const confirmed = await Order.findOneAndUpdate(
+    { _id: claimed._id, orderStatus: { $ne: 'cancelled' } },
+    { $set: set, $push: { statusHistory: { $each: history } } },
+    { new: true }
+  );
+
+  if (!confirmed) {
+    if (stockTaken) await orderService.returnItems(claimed.items);
+    return flagRefundAfterCancel(claimed._id);
+  }
+
   // Remove the purchased items from the cart (non-blocking)
-  orderService.removeOrderedFromCart(order).catch(() => {});
+  orderService.removeOrderedFromCart(confirmed).catch(() => {});
 
   // Send confirmation email (non-blocking)
-  User.findById(order.user)
+  User.findById(confirmed.user)
     .then((user) => {
       if (user) {
-        sendOrderConfirmation(order, user.email).catch(() => {});
+        sendOrderConfirmation(confirmed, user.email).catch(() => {});
       }
     })
     .catch(() => {});
 
-  logger.info(`Order ${order.orderNumber} finalized as paid`);
-  return order;
+  logger.info(`Order ${confirmed.orderNumber} finalized as paid`);
+  return confirmed;
 }
 
 /**
@@ -189,20 +201,23 @@ async function handlePaymentFailed(userId, body) {
     throw ApiError.notFound('Order not found');
   }
 
-  // A late "failed" report must never undo a payment that went through
-  if (order.paymentStatus !== 'pending') {
-    return order;
+  // A late "failed" report must never undo a payment that went through:
+  // only a still-pending payment can become failed (checked in the database)
+  const failed = await Order.findOneAndUpdate(
+    { _id: order._id, paymentStatus: 'pending' },
+    { $set: { paymentStatus: 'failed' } },
+    { new: true }
+  );
+  if (!failed) {
+    return Order.findById(order._id);
   }
-
-  order.paymentStatus = 'failed';
-  await order.save();
 
   await Payment.findOneAndUpdate(
     { razorpayOrderId: razorpay_order_id, status: 'created' },
     { status: 'failed' }
   );
 
-  return order;
+  return failed;
 }
 
 /**
@@ -241,9 +256,14 @@ async function retryPayment(userId, orderId) {
     notes: { orderId: order._id.toString(), userId: userId.toString(), retry: true },
   });
 
-  order.razorpayOrderId = rzpOrder.id;
-  order.paymentStatus = 'pending';
-  await order.save();
+  const reopened = await Order.findOneAndUpdate(
+    { _id: order._id, paymentStatus: { $in: ['pending', 'failed'] }, orderStatus: { $ne: 'cancelled' } },
+    { $set: { razorpayOrderId: rzpOrder.id, paymentStatus: 'pending' } },
+    { new: true }
+  );
+  if (!reopened) {
+    throw ApiError.badRequest('This order has already been paid or cancelled');
+  }
 
   // Create new Payment record
   await Payment.create({
@@ -256,7 +276,7 @@ async function retryPayment(userId, orderId) {
   });
 
   return {
-    order,
+    order: reopened,
     razorpay: {
       orderId: rzpOrder.id,
       amount: amountInPaise,
@@ -331,9 +351,11 @@ async function handleWebhook(rawBody, signature) {
 
     case 'payment.failed': {
       // Ignore a failed attempt on an order that was paid by another attempt
-      if (order.paymentStatus !== 'pending') break;
-      order.paymentStatus = 'failed';
-      await order.save();
+      const failed = await Order.findOneAndUpdate(
+        { _id: order._id, paymentStatus: 'pending' },
+        { $set: { paymentStatus: 'failed' } }
+      );
+      if (!failed) break;
       if (payment) {
         payment.status = 'failed';
         await payment.save();

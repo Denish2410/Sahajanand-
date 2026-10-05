@@ -1,28 +1,5 @@
 const { z } = require('zod');
 
-const createProductSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(200),
-  description: z.string().trim().max(5000).optional().default(''),
-  shortDescription: z.string().trim().max(300).optional().default(''),
-  brand: z.string().trim().max(100).optional().default(''),
-  category: z.string().min(1, 'Category is required'),
-  price: z.coerce.number().min(0, 'Price must be non-negative'),
-  mrp: z.coerce.number().min(0, 'MRP must be non-negative'),
-  stock: z.coerce.number().int().min(0, 'Stock must be non-negative').default(0),
-  sku: z.string().trim().optional().default(''),
-  specs: z
-    .array(z.object({ key: z.string(), value: z.string() }))
-    .optional()
-    .default([]),
-  warrantyMonths: z.coerce.number().int().min(0).optional().default(0),
-  features: z.array(z.string()).optional().default([]),
-  tags: z.array(z.string()).optional().default([]),
-  isFeatured: z.coerce.boolean().optional().default(false),
-  isActive: z.coerce.boolean().optional().default(true),
-});
-
-const updateProductSchema = createProductSchema.partial();
-
 // Query strings arrive as text: 'false' must mean false
 const queryBool = z.preprocess(
   (v) => (v === 'true' || v === true ? true : v === 'false' || v === false ? false : undefined),
@@ -53,4 +30,4 @@ const limitQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional().default(12),
 });
 
-module.exports = { createProductSchema, updateProductSchema, productQuerySchema, limitQuerySchema, queryBool };
+module.exports = { productQuerySchema, limitQuerySchema };

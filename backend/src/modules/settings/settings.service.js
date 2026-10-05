@@ -38,19 +38,53 @@ async function getSettings() {
   return cache;
 }
 
+// URL key → settings field
+const POLICIES = {
+  privacy: 'privacyPolicy',
+  terms: 'termsConditions',
+  shipping: 'shippingPolicy',
+  returns: 'returnPolicy',
+};
+
+const withPaymentMethods = (settings) => ({
+  ...settings,
+  paymentMethods: {
+    cod: settings.enableCod,
+    razorpay: config.razorpay.enabled,
+  },
+});
+
 /**
  * Settings as the storefront sees them, plus which payment methods can
- * actually be used right now.
+ * actually be used right now. Policy texts are fetched separately; here the
+ * storefront only learns which policies have been published.
  */
 async function getPublicSettings() {
+  const settings = withPaymentMethods(await getSettings());
+  const policies = {};
+  for (const [key, field] of Object.entries(POLICIES)) {
+    policies[key] = Boolean(settings[field]);
+    delete settings[field];
+  }
+  return { ...settings, policies };
+}
+
+/** Everything, for the admin settings screen. */
+async function getAdminSettings() {
+  return withPaymentMethods(await getSettings());
+}
+
+/**
+ * One published policy text.
+ * @param {string} key - privacy | terms | shipping | returns
+ * @returns {Promise<{key: string, content: string, updatedAt: Date}|null>}
+ */
+async function getPolicy(key) {
+  const field = Object.prototype.hasOwnProperty.call(POLICIES, key) ? POLICIES[key] : null;
+  if (!field) return null;
   const settings = await getSettings();
-  return {
-    ...settings,
-    paymentMethods: {
-      cod: settings.enableCod,
-      razorpay: config.razorpay.enabled,
-    },
-  };
+  if (!settings[field]) return null;
+  return { key, content: settings[field], updatedAt: settings.updatedAt };
 }
 
 /**
@@ -63,7 +97,7 @@ async function updateSettings(data) {
   Object.assign(doc, data);
   await doc.save();
   cache = null;
-  return getPublicSettings();
+  return getAdminSettings();
 }
 
-module.exports = { getSettings, getPublicSettings, updateSettings };
+module.exports = { getSettings, getPublicSettings, getAdminSettings, getPolicy, updateSettings };

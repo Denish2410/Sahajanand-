@@ -77,8 +77,9 @@ if (!config.isTest) {
   );
 }
 
-// 8. Global rate limiter + API routes
-app.use(globalLimiter);
+// 8. Global rate limiter + API routes (the health check stays reachable
+//    for uptime monitors even when an address is being limited)
+app.use((req, res, next) => (req.path === '/api/health' ? next() : globalLimiter(req, res, next)));
 app.use('/api', routes);
 
 // 9. 404 + error handler (must be last)

@@ -25,6 +25,10 @@ const updateSettingsSchema = z
     deliveryCharge: z.coerce.number().min(0),
     freeDeliveryAbove: z.coerce.number().min(0),
     enableCod: z.boolean(),
+    privacyPolicy: text(30000),
+    termsConditions: text(30000),
+    shippingPolicy: text(30000),
+    returnPolicy: text(30000),
     lowStockThreshold: z.coerce.number().int().min(0).max(1000),
     maintenanceMode: z.boolean(),
   })

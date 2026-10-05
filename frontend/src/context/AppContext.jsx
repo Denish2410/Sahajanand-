@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS = {
   storeName: 'Sahajanand Electronics', legalName: '', announcement: '', supportPhone: '', supportPhoneAlt: '',
   supportEmail: '', whatsapp: '', address: '', serviceAreas: ['Gandhinagar', 'Ahmedabad'], businessHours: '',
   heroTitle: '', heroLede: '', gstInclusive: true, gstPercent: 18, deliveryCharge: 0, freeDeliveryAbove: 0,
-  maintenanceMode: false, paymentMethods: { cod: false, razorpay: false },
+  maintenanceMode: false, paymentMethods: { cod: false, razorpay: false }, policies: {},
 };
 
 const GUEST_CART_KEY = 'sahajanand:cart';

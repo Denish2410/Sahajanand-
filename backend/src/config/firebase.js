@@ -1,14 +1,15 @@
-const admin = require('firebase-admin');
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 const config = require('./env');
 
-if (!admin.apps.length) {
+if (getApps().length === 0) {
   if (config.firebase.emulatorHost) {
     // Local development / end-to-end tests: the Admin SDK reads
     // FIREBASE_AUTH_EMULATOR_HOST itself and needs no service account.
-    admin.initializeApp({ projectId: config.firebase.projectId });
+    initializeApp({ projectId: config.firebase.projectId });
   } else {
-    admin.initializeApp({
-      credential: admin.credential.cert({
+    initializeApp({
+      credential: cert({
         projectId: config.firebase.projectId,
         clientEmail: config.firebase.clientEmail,
         privateKey: config.firebase.privateKey,
@@ -17,4 +18,4 @@ if (!admin.apps.length) {
   }
 }
 
-module.exports = admin;
+module.exports = { auth: () => getAuth() };

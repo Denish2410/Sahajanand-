@@ -4,7 +4,7 @@
       "slug": "professional-kitchen",
       "name": "Professional Kitchen",
       "shortName": "Kitchen",
-      "tagline": "Trusted by chefs",
+      "tagline": "For professional kitchens",
       "description": "GN-compatible reach-ins, undercounters, saladettes and blast chillers with ducted cold-air distribution and up to 100 mm insulation.",
       "image": {
         "url": "/images/products/egn-1500.webp",
@@ -25,7 +25,7 @@
       "slug": "bar-refrigeration",
       "name": "Bar Refrigeration",
       "shortName": "Bar",
-      "tagline": "Trusted by bartenders",
+      "tagline": "For bars and beverage service",
       "description": "Dual-zone wine chillers, back bars, undercounter bars and draft beer cooling systems for every venue size.",
       "image": {
         "url": "/images/products/ewg-130d.webp",
@@ -44,7 +44,7 @@
       "slug": "retail-solution",
       "name": "Retail Solution",
       "shortName": "Retail",
-      "tagline": "Trusted by retailers",
+      "tagline": "For food and beverage retail",
       "description": "Counter-top coolers, glass-top and hard-top freezers, milk coolers and upright showcases tropicalised for Indian weather.",
       "image": {
         "url": "/images/products/ecg-3door-hero.webp",
@@ -64,7 +64,7 @@
       "slug": "ice-machine",
       "name": "Ice Machine",
       "shortName": "Ice",
-      "tagline": "Trusted by bars & clinics",
+      "tagline": "Dice and flake ice machines",
       "description": "Air-cooled dice and flake ice machines from 55 to 909 kg per day, with SS 304 bodies and integrated or separate storage bins.",
       "image": {
         "url": "/images/products/eim-hero.webp",
@@ -82,7 +82,7 @@
       "slug": "vending-machine",
       "name": "Vending Machine",
       "shortName": "Vending",
-      "tagline": "India's first UPI based vending machine",
+      "tagline": "Cashless vending machines",
       "description": "Touchscreen snack, beverage, frozen and smart-locker vending with cashless payments and remote inventory management.",
       "image": {
         "url": "/images/products/galaxy.webp",

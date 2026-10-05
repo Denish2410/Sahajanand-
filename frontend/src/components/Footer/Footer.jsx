@@ -2,6 +2,7 @@ import { Link } from '../../router/index.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { useCatalogue } from '../../hooks/useCatalogue.js';
 import { telHref } from '../../utils/format.js';
+import { POLICIES } from '../../data/policies.js';
 import './Footer.css';
 
 export default function Footer() {
@@ -10,6 +11,8 @@ export default function Footer() {
   const half = Math.ceil(categories.length / 2);
   const phones = [settings.supportPhone, settings.supportPhoneAlt].filter(Boolean);
   const areas = settings.serviceAreas.join(' and ');
+  // Only policies the business has published are linked
+  const policies = POLICIES.filter(([key]) => settings.policies?.[key]);
   return (
     <footer className="footer">
       <div className="wrap footer__grid">
@@ -50,6 +53,11 @@ export default function Footer() {
           </ul>
         </div>
       </div>
+      {policies.length > 0 && (
+        <nav className="wrap footer__policies" aria-label="Policies">
+          {policies.map(([key, label]) => <Link key={key} to={`/policies/${key}`}>{label}</Link>)}
+        </nav>
+      )}
       <div className="wrap footer__legal">
         <p>© {new Date().getFullYear()} {settings.legalName || settings.storeName}{settings.gstin && ` · GSTIN ${settings.gstin}`}</p>
         <p>Elanpro is a brand of its respective owner. Specifications, features and colours are subject to change without notice.</p>

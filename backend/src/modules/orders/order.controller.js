@@ -5,7 +5,10 @@ const { isStaff } = require('../../utils/roles');
 
 const checkout = asyncHandler(async (req, res) => {
   const result = await orderService.checkout(req.user._id, req.body);
-  return ApiResponse(res, 201, 'Order placed successfully', result);
+  return ApiResponse(res, 201, 'Order placed successfully', {
+    ...result,
+    order: orderService.toCustomerOrder(result.order),
+  });
 });
 
 const quote = asyncHandler(async (req, res) => {
@@ -15,7 +18,7 @@ const quote = asyncHandler(async (req, res) => {
 
 const getMyOrders = asyncHandler(async (req, res) => {
   const { orders, meta } = await orderService.getMyOrders(req.user._id, req.query);
-  return ApiResponse(res, 200, 'Orders fetched', { orders }, meta);
+  return ApiResponse(res, 200, 'Orders fetched', { orders: orders.map(orderService.toCustomerOrder) }, meta);
 });
 
 const getOrderById = asyncHandler(async (req, res) => {
@@ -24,7 +27,8 @@ const getOrderById = asyncHandler(async (req, res) => {
     req.user._id,
     isStaff(req.user)
   );
-  return ApiResponse(res, 200, 'Order fetched', { order });
+  // Staff manage orders through /api/admin; this endpoint is the customer view
+  return ApiResponse(res, 200, 'Order fetched', { order: orderService.toCustomerOrder(order) });
 });
 
 const cancelOrder = asyncHandler(async (req, res) => {
@@ -33,7 +37,7 @@ const cancelOrder = asyncHandler(async (req, res) => {
     req.user._id,
     req.body.reason
   );
-  return ApiResponse(res, 200, 'Order cancelled', { order });
+  return ApiResponse(res, 200, 'Order cancelled', { order: orderService.toCustomerOrder(order) });
 });
 
 const getInvoice = asyncHandler(async (req, res) => {

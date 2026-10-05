@@ -29,6 +29,13 @@ const settingSchema = new mongoose.Schema(
     freeDeliveryAbove: { type: Number, default: 0, min: 0 },
     enableCod: { type: Boolean, default: true },
 
+    // Policy pages. The text is written by the business in the admin panel;
+    // a page is published only once its text has been entered.
+    privacyPolicy: { type: String, trim: true, default: '', maxlength: 30000 },
+    termsConditions: { type: String, trim: true, default: '', maxlength: 30000 },
+    shippingPolicy: { type: String, trim: true, default: '', maxlength: 30000 },
+    returnPolicy: { type: String, trim: true, default: '', maxlength: 30000 },
+
     lowStockThreshold: { type: Number, default: 3, min: 0 },
     maintenanceMode: { type: Boolean, default: false },
   },

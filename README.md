@@ -60,8 +60,10 @@ Everything is listed with instructions in `backend/.env.example` and `frontend/.
    (or use `npm run make-admin`).
 4. **Catalogue**: `npm run seed` loads the Elanpro catalogue with **zero stock and
    reference prices**. Set real prices and stock in Admin → Products & stock.
-5. **Store details**: phone, email, address, GSTIN, delivery charge and GST rule are
+5. **Store details**: phone, email, address, GSTIN, hours, delivery charge and GST rule are
    entered in Admin → Settings. Nothing is shown on the site until it is filled in.
+   **Policy pages** (privacy, terms, shipping, returns) are published the same way: paste the
+   approved text there. No policy text ships with the code.
 6. **Razorpay** (optional): keys in `backend/.env`, webhook pointing at
    `/api/payments/webhook`. Without it only pay-on-delivery is offered.
 7. **Cloudinary** (recommended on hosts with a temporary disk) for uploaded images.
@@ -86,4 +88,6 @@ cd backend && npm test && npm run lint     # API tests (in-memory MongoDB, no .e
 cd frontend && npm run build               # production build
 ```
 
-API reference: `backend/README.md`.
+API reference: `backend/README.md`. Also see `backend/docs/SECURITY.md` (access rules and the
+tested admin authorisation matrix), `backend/docs/ORDER_STATES.md` (order and payment state
+machine) and `backend/docs/CATALOGUE.md` (what each product still needs from the business).

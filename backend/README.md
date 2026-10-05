@@ -186,6 +186,7 @@ All routes are prefixed with `/api`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/settings` | — | Store name, contact details, pricing rules, available payment methods |
+| GET | `/settings/policies/:key` | — | A published policy (`privacy`, `terms`, `shipping`, `returns`); 404 until the business enters it |
 | GET | `/banners` | — | Homepage carousel slides |
 | GET | `/coupons` | — | Coupons the store chose to advertise |
 | POST | `/enquiries` | — (optional) | Request a quote; linked to the account when signed in |

@@ -11,6 +11,14 @@ const FIELDS = [
   'storeName', 'legalName', 'announcement', 'supportPhone', 'supportPhoneAlt', 'supportEmail', 'whatsapp', 'address',
   'businessHours', 'gstin', 'heroTitle', 'heroLede', 'gstInclusive', 'gstPercent', 'deliveryCharge', 'freeDeliveryAbove',
   'enableCod', 'lowStockThreshold', 'maintenanceMode',
+  'privacyPolicy', 'termsConditions', 'shippingPolicy', 'returnPolicy',
+];
+
+const POLICY_FIELDS = [
+  ['privacyPolicy', 'Privacy Policy'],
+  ['termsConditions', 'Terms & Conditions'],
+  ['shippingPolicy', 'Shipping & Delivery Policy'],
+  ['returnPolicy', 'Cancellation, Refund & Return Policy'],
 ];
 
 export function SettingsAdmin() {
@@ -34,7 +42,8 @@ export function SettingsAdmin() {
       freeDeliveryAbove: Number(f.freeDeliveryAbove) || 0, lowStockThreshold: Number(f.lowStockThreshold) || 0,
     };
     const saved = await run(() => api.admin.saveSettings(body), 'Settings saved. The storefront now uses them.');
-    if (saved) setSettings((s) => ({ ...s, ...saved }));
+    // The storefront reads its own (public) copy of the settings
+    if (saved) api.settings().then((pub) => setSettings((s) => ({ ...s, ...pub }))).catch(() => {});
   };
 
   if (loading && !f) return <><Head title="Settings" /><Loading label="Loading settings" /></>;
@@ -87,6 +96,17 @@ export function SettingsAdmin() {
               Online payment (Razorpay) is {methods.razorpay ? 'switched on' : 'not configured on the server, so customers cannot pay online yet'}.
               {!methods.razorpay && !f.enableCod && ' With pay on delivery off as well, customers cannot check out.'}
             </p>
+          </section>
+
+          <section className="ad-card">
+            <h2>Policy pages</h2>
+            <p className="muted" style={{ fontSize: 'var(--fs-0)' }}>Paste the approved text of each policy. A policy appears on the website (and is linked in the footer) only once its text is entered here; it is shown exactly as typed.</p>
+            {POLICY_FIELDS.map(([k, label]) => (
+              <div className="field" key={k}>
+                <label htmlFor={`st-${k}`}>{label} {f[k] ? '' : '(not published)'}</label>
+                <textarea id={`st-${k}`} className="textarea" rows={6} maxLength={30000} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+              </div>
+            ))}
           </section>
 
           <section className="ad-card">

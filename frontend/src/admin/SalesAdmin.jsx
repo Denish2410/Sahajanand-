@@ -64,6 +64,8 @@ function OrderDetail({ id, onClose, onChanged }) {
             {order.trackingId && <div><dt>Tracking</dt><dd>{[order.courierName, order.trackingId].filter(Boolean).join(' · ')}</dd></div>}
           </dl>
 
+          {order.internalNotes && <p className="ad-quote" style={{ whiteSpace: 'pre-wrap' }}><strong>Staff note:</strong> {order.internalNotes}</p>}
+
           <h3>Customer and delivery</h3>
           <dl className="ad-dl">
             <div><dt>Account</dt><dd>{order.user ? <>{order.user.name} · <a href={`mailto:${order.user.email}`}>{order.user.email}</a></> : 'Account removed'}</dd></div>
@@ -113,6 +115,9 @@ function OrderDetail({ id, onClose, onChanged }) {
 
           <h3>Payment</h3>
           <div className="acct__actions">
+            {order.paymentMethod === 'cod' && order.paymentStatus === 'refund_pending' && (
+              <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setPaid('refunded')}>Mark cash as returned to the customer</button>
+            )}
             {order.paymentMethod === 'cod' && order.orderStatus !== 'cancelled' && (
               paid
                 ? <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setPaid('pending')}>Undo “payment received”</button>

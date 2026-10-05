@@ -68,6 +68,8 @@ const userSchema = new mongoose.Schema(
     toJSON: {
       transform(_doc, ret) {
         delete ret.__v;
+        // The link to the sign-in provider is internal
+        delete ret.firebaseUid;
         return ret;
       },
     },

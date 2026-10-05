@@ -88,3 +88,12 @@
   .nav__acct-btn { padding: 0.3rem 0.2rem; }
   .nav__acct-btn strong { font-size: 0.75rem; }
 }
+.nav__acct-short { display: none; }
+@media (max-width: 520px) {
+  /* Small phones: keep logo, account and cart on one row whatever the cart count */
+  .nav__acct-full { display: none; }
+  .nav__acct-short { display: inline; }
+  .nav__logo { min-width: 0; flex: 0 1 auto; }
+  .nav__cart .nav__count { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; font-size: 0.68rem; }
+  .nav__actions { flex: none; margin-right: 4px; }
+}

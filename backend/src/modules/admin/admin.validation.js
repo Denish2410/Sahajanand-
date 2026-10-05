@@ -130,7 +130,7 @@ const adminUpdateOrderStatusSchema = z.object({
 });
 
 const adminUpdatePaymentStatusSchema = z.object({
-  paymentStatus: z.enum(['paid', 'pending']),
+  paymentStatus: z.enum(['paid', 'pending', 'refunded']),
 });
 
 const adminRefundSchema = z.object({

@@ -259,7 +259,7 @@ const deleteBanner = asyncHandler(async (req, res) => {
 
 // ─── Settings ────────────────────────────────────────────
 const getSettings = asyncHandler(async (_req, res) => {
-  const settings = await settingsService.getPublicSettings();
+  const settings = await settingsService.getAdminSettings();
   return ApiResponse(res, 200, 'Settings fetched', { settings });
 });
 

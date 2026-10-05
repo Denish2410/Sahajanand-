@@ -24,6 +24,7 @@ const Signup = lazy(() => import('./pages/Auth/Auth.jsx').then((m) => ({ default
 const Account = lazy(() => import('./pages/Account/Account.jsx'));
 const Checkout = lazy(() => import('./pages/Checkout/Checkout.jsx'));
 const OrderPlaced = lazy(() => import('./pages/OrderPlaced/OrderPlaced.jsx'));
+const Policy = lazy(() => import('./pages/Policy/Policy.jsx'));
 const Admin = lazy(() => import('./admin/Admin.jsx'));
 
 const ROUTES = [
@@ -41,6 +42,7 @@ const ROUTES = [
   ['/account/:tab', Account],
   ['/checkout', Checkout],
   ['/order/:id', OrderPlaced],
+  ['/policies/:key', Policy],
 ];
 
 function Boot({ status, onRetry }) {

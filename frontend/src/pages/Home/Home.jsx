@@ -4,7 +4,6 @@ import { useApp } from '../../context/AppContext.jsx';
 import { useCatalogue } from '../../hooks/useCatalogue.js';
 import { useSeo } from '../../hooks/useSeo.js';
 import { industries } from '../../data/industries.js';
-import { brand } from '../../data/brand.js';
 import { productImage } from '../../utils/format.js';
 import Hero from '../../components/Hero/Hero.jsx';
 import OfferCarousel from '../../components/OfferCarousel/OfferCarousel.jsx';
@@ -14,7 +13,6 @@ import CouponsSection from '../../components/CouponsSection/CouponsSection.jsx';
 import Icon from '../../components/Icon/Icon.jsx';
 import './Home.css';
 
-const TECH_ICON = { 'cutting-edge': 'chip', energy: 'bolt', eco: 'leaf', foam: 'layers' };
 const FEATURED_PER_TAB = 4;
 
 export default function Home() {
@@ -53,7 +51,7 @@ export default function Home() {
         <ul className="wrap home-trust__in">
           <li><Icon name="check" size={18} /> Authorised Elanpro reseller</li>
           <li><Icon name="check" size={18} /> Serving {areas}, Gujarat</li>
-          <li><Icon name="check" size={18} /> Genuine products with full specifications</li>
+          <li><Icon name="check" size={18} /> Full specifications on every model</li>
         </ul>
       </section>
 
@@ -65,7 +63,7 @@ export default function Home() {
         <div className="section-head">
           <div>
             <h2>Browse the range</h2>
-            <p className="lede">{categories.length} product lines, {Object.values(counts).reduce((a, b) => a + b, 0)} models, straight from the Elanpro catalogue.</p>
+            <p className="lede">{categories.length} product lines, {Object.values(counts).reduce((a, b) => a + b, 0)} models, with specifications from the Elanpro catalogue.</p>
           </div>
           <Link to="/products" className="text-link">View all products</Link>
         </div>
@@ -139,59 +137,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      <section className="section wrap" id="technology">
-        <div className="section-head">
-          <div>
-            <h2>Technology inside every unit</h2>
-            <p className="lede">Four things the Elanpro range has in common, whatever it keeps cold.</p>
-          </div>
-        </div>
-        <div className="home-tech">
-          {brand.technology.map((t) => (
-            <article key={t.key}>
-              <Icon name={TECH_ICON[t.key]} size={30} />
-              <h3>{t.title}</h3>
-              <p>{t.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="home-reach">
-        <div className="wrap home-reach__in">
-          <div>
-            <h2>Backed by the Elanpro network</h2>
-            <p className="lede">Elanpro has supplied commercial refrigeration across India since {brand.established}. As an authorised reseller, {settings.storeName} brings that range to {areas}.</p>
-            <Link to="/about" className="text-link">About us</Link>
-          </div>
-          <dl className="home-reach__stats" aria-label="Elanpro in numbers">
-            {brand.footprint.map((f) => (
-              <div key={f.label}>
-                <dd className="num">{f.value}</dd>
-                <dt>{f.label}</dt>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
-
-      <section className="section wrap">
-        <div className="section-head">
-          <div>
-            <h2>Who uses Elanpro</h2>
-            <p className="lede">Businesses named in the Elanpro catalogue as customers of the brand.</p>
-          </div>
-        </div>
-        <div className="home-clients">
-          {brand.customers.map((g) => (
-            <div key={g.group}>
-              <h3>{g.group}</h3>
-              <p>{g.names.join(', ')} and many more.</p>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="home-cta">
         <div className="wrap home-cta__in">

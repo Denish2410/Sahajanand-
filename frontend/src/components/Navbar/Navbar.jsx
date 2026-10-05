@@ -84,7 +84,7 @@ export default function Navbar() {
           <div className="nav__acct" ref={acctRef}>
             <button className="nav__acct-btn" aria-expanded={acct} aria-haspopup="true" onClick={() => setAcct((a) => !a)} id="navbar-account-btn">
               <small>Hello, {user ? user.name.split(' ')[0] : 'sign in'}</small>
-              <strong>Account & Orders <Icon name="down" size={14} /></strong>
+              <strong><span className="nav__acct-full">Account & Orders</span><span className="nav__acct-short">Account</span> <Icon name="down" size={14} /></strong>
             </button>
             {acct && (
               <div className="nav__acct-menu">

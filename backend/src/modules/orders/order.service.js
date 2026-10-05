@@ -10,6 +10,9 @@ const settingsService = require('../settings/settings.service');
 const { parsePagination, buildMeta } = require('../../utils/pagination');
 const { sendOrderConfirmation, sendAdminAlert } = require('../../utils/email');
 
+const MAX_PER_ITEM = 10;
+const CANCELLABLE = ['placed', 'confirmed'];
+
 /**
  * Resolve shipping address from addressId or inline object.
  * @param {string} userId
@@ -110,6 +113,13 @@ async function priceItems(userId, rawItems, couponCode) {
     }
     if (product.stock === 0) {
       itemErrors.push({ productId, message: `"${product.name}" is out of stock` });
+      continue;
+    }
+    if (quantity > MAX_PER_ITEM) {
+      itemErrors.push({
+        productId,
+        message: `You can order up to ${MAX_PER_ITEM} of "${product.name}" online`,
+      });
       continue;
     }
     if (quantity > product.stock) {
@@ -228,22 +238,35 @@ async function deductStock(order) {
 }
 
 /**
- * Put an order's items back in stock (cancellation). Only does anything if
- * the stock was actually taken out for this order.
+ * Put items back in stock.
  */
-async function restoreStock(order) {
-  if (!order.stockDeducted) return;
-  for (const item of order.items) {
+async function returnItems(items) {
+  for (const item of items) {
     await Product.findByIdAndUpdate(item.product, {
       $inc: { stock: item.quantity, soldCount: -item.quantity },
     });
   }
   // soldCount can never go below zero
   await Product.updateMany(
-    { _id: { $in: order.items.map((i) => i.product) }, soldCount: { $lt: 0 } },
+    { _id: { $in: items.map((i) => i.product) }, soldCount: { $lt: 0 } },
     { soldCount: 0 }
   );
+}
+
+/**
+ * Put an order's items back in stock (cancellation / refund), exactly once.
+ * The "stock was deducted" flag is claimed atomically in the database, so two
+ * requests arriving together cannot both restore the stock.
+ */
+async function restoreStock(order) {
+  const claimed = await Order.findOneAndUpdate(
+    { _id: order._id, stockDeducted: true },
+    { $set: { stockDeducted: false } }
+  );
   order.stockDeducted = false;
+  if (!claimed) return false;
+  await returnItems(claimed.items);
+  return true;
 }
 
 /**
@@ -435,33 +458,50 @@ async function getOrderById(orderId, userId, isAdmin = false) {
 
 /**
  * Cancel an order: shared by the customer and the admin.
- * Puts the stock back, releases the coupon and flags a refund when the
- * order was already paid online.
+ * Every step is claimed atomically in the database, so a double click, a
+ * retry or a payment arriving at the same moment cannot cancel twice,
+ * restore stock twice or lose a refund.
  *
- * @param {object} order - Order document
+ * @param {object} order - Order document (only its _id is trusted)
  * @param {object} options - { reason, by, note }
+ * @returns {Promise<object>} the cancelled order, freshly read
  */
 async function applyCancellation(order, { reason = '', by, note }) {
-  await restoreStock(order);
-
-  if (order.couponCounted) {
-    await couponService.releaseCouponUse(order.couponCode, order.user._id || order.user);
-    order.couponCounted = false;
+  const cancelled = await Order.findOneAndUpdate(
+    { _id: order._id, orderStatus: { $in: CANCELLABLE } },
+    {
+      $set: { orderStatus: 'cancelled', cancelledAt: new Date(), cancelReason: reason },
+      $push: { statusHistory: { status: 'cancelled', note, at: new Date(), by } },
+    },
+    { new: true }
+  );
+  if (!cancelled) {
+    throw ApiError.badRequest('This order can no longer be cancelled');
   }
 
-  order.orderStatus = 'cancelled';
-  order.cancelledAt = new Date();
-  order.cancelReason = reason;
-  order.statusHistory.push({ status: 'cancelled', note, at: new Date(), by });
+  await restoreStock(cancelled);
 
-  // Paid online: the money has to go back
-  if (order.paymentStatus === 'paid' && order.paymentMethod === 'razorpay') {
-    order.paymentStatus = 'refund_pending';
+  const hadCoupon = await Order.findOneAndUpdate(
+    { _id: cancelled._id, couponCounted: true },
+    { $set: { couponCounted: false } }
+  );
+  if (hadCoupon) {
+    await couponService.releaseCouponUse(cancelled.couponCode, cancelled.user);
+  }
+
+  // Money already received (online, or cash recorded by an admin) has to go back
+  const owesRefund = await Order.findOneAndUpdate(
+    { _id: cancelled._id, paymentStatus: 'paid' },
+    { $set: { paymentStatus: 'refund_pending' } }
+  );
+  if (owesRefund) {
     sendAdminAlert(
-      `Refund Required — ${order.orderNumber}`,
-      `Order ${order.orderNumber} was cancelled after payment. Amount: ₹${order.totalAmount}. Please process the refund.`
+      `Refund Required — ${cancelled.orderNumber}`,
+      `Order ${cancelled.orderNumber} was cancelled after payment. Amount: ₹${cancelled.totalAmount}. Please process the refund.`
     ).catch(() => {}); // non-blocking
   }
+
+  return Order.findById(cancelled._id).populate('user', 'name email phone company gstin');
 }
 
 /**
@@ -475,20 +515,32 @@ async function applyCancellation(order, { reason = '', by, note }) {
 async function cancelOrder(orderId, userId, reason = '') {
   const order = await getOrderById(orderId, userId);
 
-  if (!['placed', 'confirmed'].includes(order.orderStatus)) {
+  if (!CANCELLABLE.includes(order.orderStatus)) {
     throw ApiError.badRequest(
       `Cannot cancel an order that is already ${order.orderStatus}`
     );
   }
 
-  await applyCancellation(order, {
+  return applyCancellation(order, {
     reason,
     by: userId,
     note: reason || 'Cancelled by customer',
   });
+}
 
-  await order.save();
-  return order;
+/**
+ * What a customer may see of their order: no internal notes or bookkeeping
+ * flags, and a status history without staff notes or staff ids.
+ */
+function toCustomerOrder(order) {
+  const o = typeof order.toJSON === 'function' ? order.toJSON() : { ...order };
+  delete o.internalNotes;
+  delete o.needsAttention;
+  delete o.stockDeducted;
+  delete o.couponCounted;
+  o.statusHistory = (o.statusHistory || []).map((h) => ({ status: h.status, at: h.at }));
+  if (o.user && typeof o.user === 'object' && o.user._id) o.user = o.user._id;
+  return o;
 }
 
 /**
@@ -554,8 +606,10 @@ module.exports = {
   getOrderById,
   cancelOrder,
   applyCancellation,
+  toCustomerOrder,
   deductStock,
   restoreStock,
+  returnItems,
   removeOrderedFromCart,
   getInvoice,
 };

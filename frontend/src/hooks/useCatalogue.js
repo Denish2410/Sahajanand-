@@ -14,7 +14,6 @@ export function useCatalogue() {
       getCategory: (slug) => categories.find((c) => c.slug === slug),
       getProduct: (id) => products.find((p) => p.id === id),
       getByModel: (model) => products.find((p) => p.model === model),
-      getById: (_id) => products.find((p) => p._id === _id),
       byCategory: (slug) => products.filter((p) => p.category === slug),
       byFamily: (id) => products.filter((p) => p.familyId === id),
     };

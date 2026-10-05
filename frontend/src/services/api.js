@@ -95,6 +95,7 @@ export const api = {
   product: (slug) => data(get(`/products/${encodeURIComponent(slug)}`, null, { authed: false })),
   banners: () => data(get('/banners', null, { authed: false })).then((d) => d.banners),
   coupons: () => data(get('/coupons', null, { authed: false })).then((d) => d.coupons),
+  policy: (key) => data(get(`/settings/policies/${encodeURIComponent(key)}`, null, { authed: false })).then((d) => d.policy),
   submitEnquiry: (values) => data(post('/enquiries', values)).then((d) => d.enquiry),
 
   // ─── Account ─────────────────────────────────────────────

@@ -192,6 +192,12 @@ async function listOrders(query) {
 /**
  * Admin: update order status with transition validation.
  */
+const COD_PAYMENT_MOVES = {
+  paid: ['pending'],
+  pending: ['paid'],
+  refunded: ['refund_pending'],
+};
+
 const VALID_TRANSITIONS = {
   placed: ['confirmed', 'cancelled'],
   confirmed: ['shipped', 'cancelled'],
@@ -226,40 +232,45 @@ async function updateOrderStatus(orderId, data, adminId) {
     throw ApiError.badRequest('This online order has not been paid yet, so it cannot move forward. It can only be cancelled.');
   }
 
+  let updated;
   if (status === 'cancelled') {
-    await orderService.applyCancellation(order, {
+    updated = await orderService.applyCancellation(order, {
       reason: note || 'Cancelled by admin',
       by: adminId,
       note: note || 'Cancelled by admin',
     });
   } else {
-    order.orderStatus = status;
-
+    const set = { orderStatus: status };
     if (status === 'shipped') {
-      if (trackingId) order.trackingId = trackingId;
-      if (courierName) order.courierName = courierName;
+      if (trackingId) set.trackingId = trackingId;
+      if (courierName) set.courierName = courierName;
     }
-
     if (status === 'delivered') {
-      order.deliveredAt = new Date();
+      set.deliveredAt = new Date();
     }
 
-    order.statusHistory.push({
-      status,
-      note: note || `Status updated to ${status}`,
-      at: new Date(),
-      by: adminId,
-    });
-  }
+    // Only move forward from the status we just checked: if someone else
+    // changed the order in the meantime, nothing is written.
+    updated = await Order.findOneAndUpdate(
+      { _id: order._id, orderStatus: order.orderStatus },
+      {
+        $set: set,
+        $push: { statusHistory: { status, note: note || `Status updated to ${status}`, at: new Date(), by: adminId } },
+      },
+      { new: true }
+    ).populate('user', 'name email');
 
-  await order.save();
+    if (!updated) {
+      throw ApiError.conflict('This order was changed by someone else. Reload it and try again.');
+    }
+  }
 
   // Email customer (non-blocking)
-  if (order.user && order.user.email) {
-    sendOrderStatusUpdate(order, order.user.email, status).catch(() => {});
+  if (updated.user && updated.user.email) {
+    sendOrderStatusUpdate(updated, updated.user.email, status).catch(() => {});
   }
 
-  return order;
+  return updated;
 }
 
 /**
@@ -277,23 +288,39 @@ async function updatePaymentStatus(orderId, paymentStatus, adminId) {
   if (order.paymentMethod !== 'cod') {
     throw ApiError.badRequest('Payment status can only be changed by hand for cash on delivery orders');
   }
-  if (order.orderStatus === 'cancelled') {
-    throw ApiError.badRequest('This order has been cancelled');
-  }
-  if (!['pending', 'paid'].includes(order.paymentStatus)) {
-    throw ApiError.badRequest(`Payment status cannot be changed from '${order.paymentStatus}'`);
-  }
   if (order.paymentStatus === paymentStatus) return order;
 
-  order.paymentStatus = paymentStatus;
-  order.statusHistory.push({
-    status: `payment_${paymentStatus}`,
-    note: `Payment marked as ${paymentStatus} by admin`,
-    at: new Date(),
-    by: adminId,
-  });
-  await order.save();
-  return order;
+  // The only moves that make sense for cash:
+  //   pending → paid          cash collected
+  //   paid → pending          correcting a mistake
+  //   refund_pending → refunded   cash returned after a cancellation
+  const from = COD_PAYMENT_MOVES[paymentStatus];
+  if (!from || !from.includes(order.paymentStatus)) {
+    throw ApiError.badRequest(`Payment status cannot be changed from '${order.paymentStatus}' to '${paymentStatus}'`);
+  }
+  if (order.orderStatus === 'cancelled' && paymentStatus !== 'refunded') {
+    throw ApiError.badRequest('This order has been cancelled');
+  }
+
+  const updated = await Order.findOneAndUpdate(
+    { _id: order._id, paymentStatus: order.paymentStatus, orderStatus: order.orderStatus },
+    {
+      $set: { paymentStatus },
+      $push: {
+        statusHistory: {
+          status: `payment_${paymentStatus}`,
+          note: `Payment marked as ${paymentStatus} by admin`,
+          at: new Date(),
+          by: adminId,
+        },
+      },
+    },
+    { new: true }
+  );
+  if (!updated) {
+    throw ApiError.conflict('This order was changed by someone else. Reload it and try again.');
+  }
+  return updated;
 }
 
 /**

@@ -62,35 +62,6 @@ export const Check = ({ label, f, set, k }) => (
   <label className="ad-check"><input type="checkbox" checked={!!f[k]} onChange={(e) => set({ ...f, [k]: e.target.checked })} /> {label}</label>
 );
 
-export function Pager({ page, pages, onPage, total }) {
-  if (pages <= 1) return <p className="ad-pager muted">{total} {total === 1 ? 'row' : 'rows'}</p>;
-  return (
-    <div className="ad-pager">
-      <span className="muted">{total} rows</span>
-      <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => onPage(page - 1)}>Previous</button>
-      <span className="num">Page {page + 1} of {pages}</span>
-      <button className="btn btn-ghost btn-sm" disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>Next</button>
-    </div>
-  );
-}
-export function usePaged(rows, size = 10) {
-  const [page, setPage] = useState(0);
-  const pages = Math.max(1, Math.ceil(rows.length / size));
-  const safe = Math.min(page, pages - 1);
-  return { slice: rows.slice(safe * size, safe * size + size), page: safe, pages, setPage, total: rows.length };
-}
-
-export function download(filename, text, type = 'text/plain') {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 500);
-}
-export function exportCSV(filename, rows, columns) {
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const body = rows.map((r) => columns.map(([, get]) => esc(typeof get === 'function' ? get(r) : r[get])).join(','));
-  download(filename, [columns.map(([h]) => esc(h)).join(','), ...body].join('\n'), 'text/csv');
-}
 export const Empty = ({ children }) => <div className="empty"><p className="muted">{children}</p></div>;
 
 // ─── Server-backed lists ─────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const razorpay = require('./razorpay.client');
+const razorpay = require('../../config/razorpay');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
 const ApiError = require('../../utils/ApiError');
@@ -97,20 +97,9 @@ async function refundPayment(paymentId, amount = 0) {
   return refund;
 }
 
-/**
- * Fetch a payment from Razorpay.
- * @param {string} paymentId - Razorpay payment ID
- * @returns {Promise<object>}
- */
-async function fetchPayment(paymentId) {
-  assertConfigured();
-  return await razorpay.payments.fetch(paymentId);
-}
-
 module.exports = {
   createOrder,
   verifySignature,
   verifyWebhookSignature,
   refundPayment,
-  fetchPayment,
 };

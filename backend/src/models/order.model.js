@@ -159,6 +159,13 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Staff-only notes (stock problems after payment and the like).
+    // Never sent to the customer.
+    internalNotes: {
+      type: String,
+      default: '',
+      maxlength: 2000,
+    },
     needsAttention: {
       type: Boolean,
       default: false,
