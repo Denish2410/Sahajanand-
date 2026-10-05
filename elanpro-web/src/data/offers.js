@@ -1,0 +1,48 @@
+// Homepage carousel slides — updated to match real product catalogue models.
+export const offers = [
+  {
+    badge: 'Professional Kitchen Highlight',
+    title: 'Rapid chill cooked food in 90 minutes',
+    subtitle: 'Irinox blast chilling stops bacterial growth, and shock freezes down to −18°C in 240 minutes.',
+    productModel: 'EF 20.1',
+    facts: ['4 GN Trays', '20 kg chill cycle', 'UV sterilization'],
+    cta: 'Explore product',
+    tone: 'ice',
+  },
+  {
+    badge: 'Industry Standard',
+    title: 'True T-49-HC Solid 2-Door Reach-In',
+    subtitle: 'R290 Hydrocarbon refrigerant, bottom-mounted compressor, and lifetime-guaranteed door hinges.',
+    productModel: 'T-49-HC',
+    facts: ['1387 L', '0.5°C to 3.3°C', 'R290'],
+    cta: 'Explore product',
+    tone: 'steel',
+  },
+  {
+    badge: 'Bar Collection',
+    title: 'True Dual Zone Wine Chiller',
+    subtitle: 'Two independent temperature zones, pull-out wooden racks and Low-E UV blocking glass.',
+    productModel: 'TWD-24-HC',
+    facts: ['45 bottles', '5°C to 18°C', 'Dual Zone'],
+    cta: 'Explore product',
+    tone: 'dark',
+  },
+  {
+    badge: 'Ice Technology',
+    title: 'Hoshizaki Crescent Cube Ice Maker',
+    subtitle: 'Air-cooled modular ice maker with stainless steel evaporator producing 145 kg of clear ice daily.',
+    productModel: 'KM-320MAJ',
+    facts: ['145 kg / 24 hrs', 'Crescent Cube', 'EverCheck Alert'],
+    cta: 'Explore product',
+    tone: 'ice',
+  },
+  {
+    badge: 'Smart Vending',
+    title: 'Seaga Combination Vending Machine',
+    subtitle: 'Dual temperature zones for snacks and cold drinks with integrated UPI QR code & NFC reader.',
+    productModel: 'INF5C',
+    facts: ['38 Selections', '4°C to 20°C', 'UPI Cashless'],
+    cta: 'Explore product',
+    tone: 'steel',
+  },
+];

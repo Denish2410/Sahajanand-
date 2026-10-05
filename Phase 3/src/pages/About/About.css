@@ -1,0 +1,27 @@
+.about__head h1 { max-width: 22ch; padding: 0.5rem 0 clamp(1.5rem, 4vw, 3rem); }
+.about__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 4rem); align-items: start; }
+.about__grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-2); position: sticky; top: 200px; }
+.about__text { display: grid; gap: 1.1rem; font-size: var(--fs-2); color: var(--ink-2); justify-items: start; }
+.about__text p:first-child { color: var(--ink); font-size: var(--fs-3); line-height: 1.4; }
+.about__stats { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: var(--section); border-top: 2px solid var(--ink); }
+.about__stats > div { padding: 1.5rem 1rem 1rem 0; display: flex; flex-direction: column; }
+.about__stats dd { font-stretch: 120%; font-weight: 750; font-size: clamp(2rem, 1rem + 3vw, 3.75rem); letter-spacing: -0.03em; line-height: 1; }
+.about__stats dt { order: 2; margin-top: 0.5rem; color: var(--ink-2); }
+.about__places { padding: 1rem 0 var(--section); color: var(--ink-2); }
+.about__tech { background: var(--ink); color: #fff; }
+.about__tech h2 { margin-bottom: 2rem; }
+.about__tech-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; }
+.about__tech-grid article { display: grid; gap: 0.6rem; align-content: start; padding-top: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.3); }
+.about__tech-grid svg { color: #ff9a66; }
+.about__tech-grid p { color: rgba(255, 255, 255, 0.78); }
+.about__clients { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 2rem; }
+.about__clients h3 { padding-bottom: 0.75rem; margin-bottom: 1rem; border-bottom: 2px solid var(--ink); }
+.about__clients ul { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+.about__clients li { padding: 0.35rem 0.7rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-1); font-weight: 550; font-size: var(--fs-0); }
+@media (max-width: 900px) {
+  .about__grid, .about__clients { grid-template-columns: 1fr; }
+  .about__grid img { position: static; }
+  .about__tech-grid { grid-template-columns: 1fr 1fr; }
+  .about__stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) { .about__tech-grid { grid-template-columns: 1fr; } }
