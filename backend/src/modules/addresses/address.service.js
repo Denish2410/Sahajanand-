@@ -49,6 +49,9 @@ async function updateAddress(userId, addressId, data) {
 
   if (data.isDefault === true) {
     await Address.updateMany({ user: userId, _id: { $ne: addressId } }, { isDefault: false });
+  } else if (data.isDefault === false && address.isDefault) {
+    // There is always one default address
+    delete data.isDefault;
   }
 
   Object.assign(address, data);

@@ -1,10 +1,16 @@
 const orderService = require('./order.service');
 const asyncHandler = require('../../utils/asyncHandler');
 const ApiResponse = require('../../utils/ApiResponse');
+const { isStaff } = require('../../utils/roles');
 
 const checkout = asyncHandler(async (req, res) => {
   const result = await orderService.checkout(req.user._id, req.body);
   return ApiResponse(res, 201, 'Order placed successfully', result);
+});
+
+const quote = asyncHandler(async (req, res) => {
+  const result = await orderService.quote(req.user._id, req.body);
+  return ApiResponse(res, 200, 'Order quote calculated', { quote: result });
 });
 
 const getMyOrders = asyncHandler(async (req, res) => {
@@ -16,7 +22,7 @@ const getOrderById = asyncHandler(async (req, res) => {
   const order = await orderService.getOrderById(
     req.params.id,
     req.user._id,
-    req.user.role === 'admin'
+    isStaff(req.user)
   );
   return ApiResponse(res, 200, 'Order fetched', { order });
 });
@@ -34,9 +40,9 @@ const getInvoice = asyncHandler(async (req, res) => {
   const invoice = await orderService.getInvoice(
     req.params.id,
     req.user._id,
-    req.user.role === 'admin'
+    isStaff(req.user)
   );
   return ApiResponse(res, 200, 'Invoice fetched', { invoice });
 });
 
-module.exports = { checkout, getMyOrders, getOrderById, cancelOrder, getInvoice };
+module.exports = { checkout, quote, getMyOrders, getOrderById, cancelOrder, getInvoice };

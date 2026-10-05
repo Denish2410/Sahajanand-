@@ -30,6 +30,8 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
     },
     name: { type: String, required: true },
+    model: { type: String, default: '' },
+    slug: { type: String, default: '' },
     image: { type: String, default: '' },
     sku: { type: String, default: '' },
     price: { type: Number, required: true },
@@ -88,6 +90,21 @@ const orderSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // GST added on top of the items (0 when prices are GST-inclusive)
+    taxAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    gstPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    gstInclusive: {
+      type: Boolean,
+      default: true,
+    },
     totalAmount: {
       type: Number,
       required: true,
@@ -131,6 +148,16 @@ const orderSchema = new mongoose.Schema(
     },
     deliveredAt: {
       type: Date,
+    },
+    // True once the items were taken out of stock, so a cancellation knows
+    // whether there is anything to put back.
+    stockDeducted: {
+      type: Boolean,
+      default: false,
+    },
+    couponCounted: {
+      type: Boolean,
+      default: false,
     },
     needsAttention: {
       type: Boolean,

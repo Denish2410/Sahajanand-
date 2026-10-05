@@ -3,6 +3,12 @@ const ApiError = require('../../utils/ApiError');
 const mongoose = require('mongoose');
 const { parsePagination, buildMeta } = require('../../utils/pagination');
 
+function assertId(id) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw ApiError.badRequest('Invalid review ID');
+  }
+}
+
 /**
  * Recalculate product rating average and count from reviews.
  * @param {string} productId
@@ -115,6 +121,7 @@ async function createReview(productId, userId, data) {
  * Update a review (owner only).
  */
 async function updateReview(reviewId, userId, data) {
+  assertId(reviewId);
   const review = await Review.findById(reviewId);
   if (!review) {
     throw ApiError.notFound('Review not found');
@@ -136,6 +143,7 @@ async function updateReview(reviewId, userId, data) {
  * Delete a review (owner or admin).
  */
 async function deleteReview(reviewId, userId, isAdmin = false) {
+  assertId(reviewId);
   const review = await Review.findById(reviewId);
   if (!review) {
     throw ApiError.notFound('Review not found');
@@ -172,6 +180,7 @@ async function listAllReviews(query) {
  * Admin: toggle review approval.
  */
 async function toggleApproval(reviewId) {
+  assertId(reviewId);
   const review = await Review.findById(reviewId);
   if (!review) throw ApiError.notFound('Review not found');
   review.isApproved = !review.isApproved;

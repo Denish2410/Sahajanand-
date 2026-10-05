@@ -20,7 +20,7 @@ const login = asyncHandler(async (req, res) => {
 
   let user;
   try {
-    user = await authService.loginWithFirebase(idToken);
+    user = await authService.loginWithFirebase(idToken, req.body);
   } catch (err) {
     // Convert Firebase verification errors to 401
     if (err instanceof ApiError) throw err;

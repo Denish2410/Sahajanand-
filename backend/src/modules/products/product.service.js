@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
-const { Product, Category, Order } = require('../../models');
+const { Product, Category, Order, Cart, Wishlist, Banner } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const cloudinaryService = require('../../integrations/cloudinary/cloudinary.service');
 const { parsePagination, buildMeta } = require('../../utils/pagination');
+const escapeRegex = require('../../utils/escapeRegex');
 
 /**
  * Build a sort object from the sort string.
@@ -21,6 +22,12 @@ function buildSort(sortStr) {
       return { ratingAverage: -1, ratingCount: -1 };
     case 'discount':
       return { discountPercent: -1 };
+    case 'name':
+      return { model: 1, name: 1 };
+    case 'stock_asc':
+      return { stock: 1, name: 1 };
+    case 'catalogue':
+      return { sortOrder: 1, createdAt: 1 };
     case 'newest':
     default:
       return { createdAt: -1 };
@@ -41,6 +48,8 @@ async function listProducts(query, includeInactive = false) {
 
   if (!includeInactive) {
     filter.isActive = true;
+  } else if (query.isActive !== undefined) {
+    filter.isActive = query.isActive;
   }
 
   // Category filter (slug or id)
@@ -59,7 +68,17 @@ async function listProducts(query, includeInactive = false) {
 
   // Brand filter
   if (query.brand) {
-    filter.brand = { $regex: new RegExp(`^${query.brand}$`, 'i') };
+    filter.brand = { $regex: new RegExp(`^${escapeRegex(query.brand)}$`, 'i') };
+  }
+
+  if (query.subcategory) {
+    filter.subcategory = query.subcategory;
+  }
+  if (query.tempClass) {
+    filter.tempClass = query.tempClass;
+  }
+  if (query.family) {
+    filter.familyId = query.family;
   }
 
   // Price range
@@ -71,6 +90,15 @@ async function listProducts(query, includeInactive = false) {
 
   // Stock filter
   if (query.inStock === true || query.inStock === 'true') {
+    filter.stock = { $gt: 0 };
+  }
+
+  // Stock level (admin inventory views)
+  if (query.stockStatus === 'out') {
+    filter.stock = 0;
+  } else if (query.stockStatus === 'low') {
+    filter.stock = { $gt: 0, $lte: query.lowStockThreshold ?? 3 };
+  } else if (query.stockStatus === 'in') {
     filter.stock = { $gt: 0 };
   }
 
@@ -101,14 +129,11 @@ async function listProducts(query, includeInactive = false) {
         .populate('category', 'name slug')
         .lean();
     } else {
-      // Regex fallback
+      // Regex fallback (partial words, model numbers typed without spaces)
+      const rx = new RegExp(escapeRegex(query.search).replace(/\s+/g, '\\s*'), 'i');
       const regexFilter = {
         ...filter,
-        $or: [
-          { name: { $regex: query.search, $options: 'i' } },
-          { brand: { $regex: query.search, $options: 'i' } },
-          { tags: { $regex: query.search, $options: 'i' } },
-        ],
+        $or: [{ name: rx }, { model: rx }, { sku: rx }, { brand: rx }, { subcategory: rx }, { tags: rx }],
       };
       total = await Product.countDocuments(regexFilter);
       products = await Product.find(regexFilter)
@@ -186,12 +211,21 @@ async function getProductBySlug(slug) {
     _id: { $ne: product._id },
     isActive: true,
   })
-    .sort({ soldCount: -1 })
+    .sort({ soldCount: -1, sortOrder: 1 })
     .limit(8)
     .populate('category', 'name slug')
     .lean();
 
-  return { product, relatedProducts };
+  // Other models of the same series
+  const variants = product.familyId
+    ? await Product.find({ familyId: product.familyId, isActive: true })
+        .sort({ sortOrder: 1, model: 1 })
+        .limit(30)
+        .populate('category', 'name slug')
+        .lean()
+    : [];
+
+  return { product, relatedProducts, variants };
 }
 
 /**
@@ -252,7 +286,7 @@ async function createProduct(data) {
     throw ApiError.badRequest('Category not found');
   }
 
-  const product = await Product.create(data);
+  const product = await Product.create({ ...data, priceSource: 'confirmed' });
   return product.populate('category', 'name slug');
 }
 
@@ -275,6 +309,11 @@ async function updateProduct(id, data) {
     }
   }
 
+  // A price set from the admin panel is the store's own confirmed price
+  if (data.price !== undefined && data.price !== product.price) {
+    product.priceSource = 'confirmed';
+  }
+
   Object.assign(product, data);
   await product.save();
   return product.populate('category', 'name slug');
@@ -294,13 +333,20 @@ async function deleteProduct(id) {
     product.isActive = false;
     await product.save();
   } else {
-    // Hard delete — remove Cloudinary images
+    // Hard delete — remove stored images
     if (product.images && product.images.length > 0) {
-      const publicIds = product.images.map((img) => img.publicId);
+      const publicIds = product.images.map((img) => img.publicId).filter(Boolean);
       await cloudinaryService.deleteMultipleImages(publicIds);
     }
     await Product.findByIdAndDelete(id);
+    await Promise.all([
+      Cart.updateMany({}, { $pull: { items: { product: product._id } } }),
+      Wishlist.updateMany({}, { $pull: { products: product._id } }),
+      Banner.deleteMany({ product: product._id }),
+    ]);
   }
+
+  return { archived: orderCount > 0 };
 }
 
 /**
@@ -363,15 +409,34 @@ async function uploadImages(id, files) {
 async function deleteImage(productId, publicId) {
   const product = await getProductById(productId);
 
-  const decodedPublicId = decodeURIComponent(publicId);
-  const index = product.images.findIndex((img) => img.publicId === decodedPublicId);
+  // Accepts the image's own id, or its storage public ID
+  const index = product.images.findIndex(
+    (img) => img._id.toString() === publicId || (img.publicId && img.publicId === publicId)
+  );
   if (index === -1) {
     throw ApiError.notFound('Image not found on this product');
   }
 
-  await cloudinaryService.deleteImage(decodedPublicId);
+  await cloudinaryService.deleteImage(product.images[index].publicId);
   product.images.splice(index, 1);
   await product.save();
+  return product;
+}
+
+/**
+ * Reorder a product's images (the first one is the main photo).
+ * @param {string} productId
+ * @param {string[]} imageIds - every image id of the product, in the new order
+ */
+async function reorderImages(productId, imageIds) {
+  const product = await getProductById(productId);
+  const byId = new Map(product.images.map((img) => [img._id.toString(), img]));
+  if (imageIds.length !== byId.size || !imageIds.every((id) => byId.has(id)) || new Set(imageIds).size !== byId.size) {
+    throw ApiError.badRequest('Image order must list every image of the product exactly once');
+  }
+  product.images = imageIds.map((id) => byId.get(id));
+  await product.save();
+  return product;
 }
 
 module.exports = {
@@ -389,4 +454,5 @@ module.exports = {
   updateStock,
   uploadImages,
   deleteImage,
+  reorderImages,
 };

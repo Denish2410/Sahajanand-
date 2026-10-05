@@ -1,10 +1,14 @@
 const mongoose = require('mongoose');
-const { Order, Product, Cart, Address, Coupon, Payment } = require('../../models');
+const { Order, Product, Cart, Address, Payment, User } = require('../../models');
 const config = require('../../config/env');
 const ApiError = require('../../utils/ApiError');
+const logger = require('../../utils/logger');
 const { generateOrderNumber } = require('../../utils/generateToken');
 const razorpayService = require('../../integrations/razorpay/razorpay.service');
+const couponService = require('../coupons/coupon.service');
+const settingsService = require('../settings/settings.service');
 const { parsePagination, buildMeta } = require('../../utils/pagination');
+const { sendOrderConfirmation, sendAdminAlert } = require('../../utils/email');
 
 /**
  * Resolve shipping address from addressId or inline object.
@@ -65,63 +69,191 @@ async function resolveItems(userId, bodyItems) {
 }
 
 /**
- * Validate and apply coupon.
- * @param {string} couponCode
- * @param {number} itemsTotal
+ * Price a set of items on the server: current prices, stock checks, coupon,
+ * GST and delivery. Shared by the checkout quote and by order creation so
+ * the customer is always shown exactly what will be charged.
+ *
  * @param {string} userId
- * @returns {Promise<{discount: number, coupon: object}>}
+ * @param {Array<{productId: string, quantity: number}>} rawItems
+ * @param {string} [couponCode]
+ * @returns {Promise<object>}
  */
-async function applyCoupon(couponCode, itemsTotal, userId) {
-  if (!couponCode) return { discount: 0, coupon: null };
+async function priceItems(userId, rawItems, couponCode) {
+  const settings = await settingsService.getSettings();
 
-  const coupon = await Coupon.findOne({
-    code: couponCode.toUpperCase(),
-    isActive: true,
-  });
-
-  if (!coupon) {
-    throw ApiError.badRequest('Invalid coupon code');
-  }
-
-  const now = new Date();
-  if (coupon.startsAt && now < coupon.startsAt) {
-    throw ApiError.badRequest('Coupon is not yet active');
-  }
-  if (coupon.expiresAt && now > coupon.expiresAt) {
-    throw ApiError.badRequest('Coupon has expired');
-  }
-  if (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) {
-    throw ApiError.badRequest('Coupon usage limit reached');
-  }
-  if (coupon.minOrderValue > 0 && itemsTotal < coupon.minOrderValue) {
-    throw ApiError.badRequest(
-      `Minimum order of ₹${coupon.minOrderValue} required for this coupon`
-    );
-  }
-
-  // Per-user limit check
-  const userUsage = coupon.usedBy.find(
-    (u) => u.user.toString() === userId.toString()
-  );
-  if (userUsage && userUsage.count >= coupon.perUserLimit) {
-    throw ApiError.badRequest('You have already used this coupon the maximum number of times');
-  }
-
-  // Calculate discount
-  let discount = 0;
-  if (coupon.discountType === 'percent') {
-    discount = Math.round((itemsTotal * coupon.discountValue) / 100);
-    if (coupon.maxDiscount > 0) {
-      discount = Math.min(discount, coupon.maxDiscount);
+  // Merge duplicate lines so the stock check sees the full quantity
+  const quantities = new Map();
+  const itemErrors = [];
+  for (const raw of rawItems) {
+    if (!mongoose.isValidObjectId(raw.productId)) {
+      itemErrors.push({ productId: raw.productId, message: 'Invalid product ID' });
+      continue;
     }
-  } else {
-    discount = coupon.discountValue;
+    quantities.set(raw.productId, (quantities.get(raw.productId) || 0) + raw.quantity);
   }
 
-  // Don't let discount exceed items total
-  discount = Math.min(discount, itemsTotal);
+  const products = await Product.find({ _id: { $in: [...quantities.keys()] } });
+  const byId = new Map(products.map((p) => [p._id.toString(), p]));
 
-  return { discount, coupon };
+  const orderItems = [];
+  const lines = [];
+
+  for (const [productId, quantity] of quantities) {
+    const product = byId.get(productId);
+    if (!product) {
+      itemErrors.push({ productId, message: 'Product not found' });
+      continue;
+    }
+    if (!product.isActive) {
+      itemErrors.push({ productId, message: `"${product.name}" is no longer available` });
+      continue;
+    }
+    if (product.stock === 0) {
+      itemErrors.push({ productId, message: `"${product.name}" is out of stock` });
+      continue;
+    }
+    if (quantity > product.stock) {
+      itemErrors.push({
+        productId,
+        message: `"${product.name}" only has ${product.stock} in stock`,
+      });
+      continue;
+    }
+
+    // Snapshot: use server-side prices, never client-provided
+    orderItems.push({
+      product: product._id,
+      name: product.name,
+      model: product.model || '',
+      slug: product.slug,
+      image: product.images.length > 0 ? product.images[0].url : '',
+      sku: product.sku || '',
+      price: product.price,
+      mrp: product.mrp,
+      quantity,
+    });
+    lines.push({ price: product.price, quantity, category: product.category });
+  }
+
+  const itemsTotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  // Coupon
+  let discount = 0;
+  let coupon = null;
+  let couponError = '';
+  if (couponCode && orderItems.length > 0) {
+    try {
+      ({ discount, coupon } = await couponService.evaluateCoupon(couponCode, lines, userId));
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      couponError = err.message;
+    }
+  }
+
+  const taxable = itemsTotal - discount;
+  const taxAmount = settings.gstInclusive ? 0 : Math.round((taxable * settings.gstPercent) / 100);
+  const deliveryCharge =
+    orderItems.length === 0 || taxable >= settings.freeDeliveryAbove ? 0 : settings.deliveryCharge;
+  const totalAmount = taxable + taxAmount + deliveryCharge;
+
+  return {
+    orderItems,
+    categories: lines.map((l) => l.category),
+    itemErrors,
+    itemsTotal,
+    discount,
+    coupon,
+    couponError,
+    taxAmount,
+    gstPercent: settings.gstPercent,
+    gstInclusive: settings.gstInclusive,
+    deliveryCharge,
+    freeDeliveryAbove: settings.freeDeliveryAbove,
+    totalAmount,
+    settings,
+  };
+}
+
+/**
+ * Quote: what the order would cost right now, without creating it.
+ */
+async function quote(userId, body) {
+  const rawItems = await resolveItems(userId, body.items);
+  const priced = await priceItems(userId, rawItems, body.couponCode);
+
+  return {
+    items: priced.orderItems,
+    itemErrors: priced.itemErrors,
+    itemsTotal: priced.itemsTotal,
+    discount: priced.discount,
+    couponCode: priced.coupon ? priced.coupon.code : '',
+    couponError: priced.couponError,
+    taxAmount: priced.taxAmount,
+    gstPercent: priced.gstPercent,
+    gstInclusive: priced.gstInclusive,
+    deliveryCharge: priced.deliveryCharge,
+    freeDeliveryAbove: priced.freeDeliveryAbove,
+    totalAmount: priced.totalAmount,
+    paymentMethods: {
+      cod: priced.settings.enableCod,
+      razorpay: config.razorpay.enabled,
+    },
+  };
+}
+
+/**
+ * Take the order's items out of stock, all or nothing.
+ * @returns {Promise<string|null>} name of the item that ran short, or null
+ */
+async function deductStock(order) {
+  const done = [];
+  for (const item of order.items) {
+    const result = await Product.findOneAndUpdate(
+      { _id: item.product, stock: { $gte: item.quantity } },
+      { $inc: { stock: -item.quantity, soldCount: item.quantity } },
+      { new: true }
+    );
+    if (!result) {
+      for (const prev of done) {
+        await Product.findByIdAndUpdate(prev.product, {
+          $inc: { stock: prev.quantity, soldCount: -prev.quantity },
+        });
+      }
+      return item.name;
+    }
+    done.push(item);
+  }
+  order.stockDeducted = true;
+  return null;
+}
+
+/**
+ * Put an order's items back in stock (cancellation). Only does anything if
+ * the stock was actually taken out for this order.
+ */
+async function restoreStock(order) {
+  if (!order.stockDeducted) return;
+  for (const item of order.items) {
+    await Product.findByIdAndUpdate(item.product, {
+      $inc: { stock: item.quantity, soldCount: -item.quantity },
+    });
+  }
+  // soldCount can never go below zero
+  await Product.updateMany(
+    { _id: { $in: order.items.map((i) => i.product) }, soldCount: { $lt: 0 } },
+    { soldCount: 0 }
+  );
+  order.stockDeducted = false;
+}
+
+/**
+ * Remove the ordered products from the customer's cart.
+ */
+async function removeOrderedFromCart(order) {
+  await Cart.updateOne(
+    { user: order.user },
+    { $pull: { items: { product: { $in: order.items.map((i) => i.product) } } } }
+  );
 }
 
 /**
@@ -140,120 +272,79 @@ async function checkout(userId, body) {
   // 2. Resolve items
   const rawItems = await resolveItems(userId, bodyItems);
 
-  // 3. Check COD allowed
-  if (paymentMethod === 'cod' && !config.business.enableCod) {
+  // 3. Price everything on the server
+  const priced = await priceItems(userId, rawItems, couponCode);
+
+  // 4. Check the payment method is available
+  if (paymentMethod === 'cod' && !priced.settings.enableCod) {
     throw ApiError.badRequest('Cash on Delivery is not available');
   }
-
-  // 4. Load products and validate
-  const orderItems = [];
-  const productErrors = [];
-
-  for (const rawItem of rawItems) {
-    if (!mongoose.isValidObjectId(rawItem.productId)) {
-      productErrors.push({ productId: rawItem.productId, message: 'Invalid product ID' });
-      continue;
-    }
-
-    const product = await Product.findById(rawItem.productId);
-    if (!product) {
-      productErrors.push({ productId: rawItem.productId, message: 'Product not found' });
-      continue;
-    }
-    if (!product.isActive) {
-      productErrors.push({ productId: rawItem.productId, message: `"${product.name}" is no longer available` });
-      continue;
-    }
-    if (product.stock === 0) {
-      productErrors.push({ productId: rawItem.productId, message: `"${product.name}" is out of stock` });
-      continue;
-    }
-    if (rawItem.quantity > product.stock) {
-      productErrors.push({
-        productId: rawItem.productId,
-        message: `"${product.name}" only has ${product.stock} in stock`,
-      });
-      continue;
-    }
-
-    // Snapshot: use server-side prices, never client-provided
-    orderItems.push({
-      product: product._id,
-      name: product.name,
-      image: product.images.length > 0 ? product.images[0].url : '',
-      sku: product.sku || '',
-      price: product.price,
-      mrp: product.mrp,
-      quantity: rawItem.quantity,
-    });
+  if (paymentMethod === 'razorpay' && !config.razorpay.enabled) {
+    throw ApiError.badRequest('Online payment is not available right now. Please choose another payment method.');
   }
 
-  if (productErrors.length > 0) {
-    throw ApiError.badRequest('Some items have issues', productErrors);
+  if (priced.itemErrors.length > 0) {
+    throw ApiError.badRequest('Some items have issues', priced.itemErrors);
   }
-
-  if (orderItems.length === 0) {
+  if (priced.orderItems.length === 0) {
     throw ApiError.badRequest('No valid items in the order');
   }
+  if (priced.couponError) {
+    throw ApiError.badRequest(priced.couponError);
+  }
 
-  // 5. Compute totals (server-side only)
-  const itemsTotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const { orderItems, itemsTotal, discount, coupon, taxAmount, deliveryCharge, totalAmount } = priced;
 
-  // 6. Apply coupon
-  const { discount, coupon } = await applyCoupon(couponCode, itemsTotal, userId);
+  // 5. Create the order (retry on the unlikely order-number collision)
+  let order;
+  for (let attempt = 0; attempt < 5 && !order; attempt++) {
+    try {
+      order = await Order.create({
+        orderNumber: generateOrderNumber(),
+        user: userId,
+        items: orderItems,
+        shippingAddress,
+        itemsTotal,
+        discount,
+        couponCode: coupon ? coupon.code : '',
+        deliveryCharge,
+        taxAmount,
+        gstPercent: priced.gstPercent,
+        gstInclusive: priced.gstInclusive,
+        totalAmount,
+        paymentMethod,
+        paymentStatus: 'pending',
+        orderStatus: 'placed',
+        notes: notes || '',
+        statusHistory: [{ status: 'placed', note: 'Order placed', at: new Date(), by: userId }],
+      });
+    } catch (err) {
+      if (!(err.code === 11000 && err.keyPattern && err.keyPattern.orderNumber)) throw err;
+    }
+  }
+  if (!order) throw ApiError.internal('Could not create the order. Please try again.');
 
-  // 7. Delivery charge
-  const subtotalAfterDiscount = itemsTotal - discount;
-  const deliveryCharge =
-    subtotalAfterDiscount >= config.business.freeDeliveryAbove
-      ? 0
-      : config.business.deliveryCharge;
-
-  // 8. Final total
-  const totalAmount = subtotalAfterDiscount + deliveryCharge;
-
-  // 9. Generate order number (collision-safe retry)
-  let orderNumber;
-  let attempts = 0;
-  do {
-    orderNumber = generateOrderNumber();
-    const existing = await Order.findOne({ orderNumber }).lean();
-    if (!existing) break;
-    attempts++;
-  } while (attempts < 5);
-
-  // 10. Create the order
-  const order = await Order.create({
-    orderNumber,
-    user: userId,
-    items: orderItems,
-    shippingAddress,
-    itemsTotal,
-    discount,
-    couponCode: couponCode ? couponCode.toUpperCase() : '',
-    deliveryCharge,
-    totalAmount,
-    paymentMethod,
-    paymentStatus: 'pending',
-    orderStatus: 'placed',
-    notes: notes || '',
-    statusHistory: [{ status: 'placed', note: 'Order placed', at: new Date(), by: userId }],
-  });
-
-  // 11. Handle payment method
+  // 6. Handle payment method
   if (paymentMethod === 'razorpay') {
-    // Create Razorpay order
+    // Stock is taken when the payment is confirmed (see finalizePaidOrder)
     const amountInPaise = Math.round(totalAmount * 100);
-    const rzpOrder = await razorpayService.createOrder({
-      amount: amountInPaise,
-      receipt: orderNumber,
-      notes: { orderId: order._id.toString(), userId: userId.toString() },
-    });
+    let rzpOrder;
+    try {
+      rzpOrder = await razorpayService.createOrder({
+        amount: amountInPaise,
+        receipt: order.orderNumber,
+        notes: { orderId: order._id.toString(), userId: userId.toString() },
+      });
+    } catch (err) {
+      // Do not leave an unpayable order behind
+      await Order.findByIdAndDelete(order._id);
+      logger.error(`Razorpay order creation failed for ${order.orderNumber}: ${err.message || err}`);
+      throw new ApiError(502, 'Could not start the online payment. Please try again or choose another payment method.');
+    }
 
     order.razorpayOrderId = rzpOrder.id;
     await order.save();
 
-    // Create Payment record
     await Payment.create({
       order: order._id,
       user: userId,
@@ -262,11 +353,6 @@ async function checkout(userId, body) {
       currency: 'INR',
       status: 'created',
     });
-
-    // Update coupon usage
-    if (coupon) {
-      await updateCouponUsage(coupon, userId);
-    }
 
     return {
       order,
@@ -279,51 +365,29 @@ async function checkout(userId, body) {
     };
   }
 
-  // COD flow
-  // Decrement stock atomically
-  for (const item of orderItems) {
-    const result = await Product.findOneAndUpdate(
-      { _id: item.product, stock: { $gte: item.quantity } },
-      { $inc: { stock: -item.quantity, soldCount: item.quantity } },
-      { new: true }
-    );
-    if (!result) {
-      // Restock previously decremented items
-      for (const prev of orderItems) {
-        if (prev.product.toString() === item.product.toString()) break;
-        await Product.findByIdAndUpdate(prev.product, {
-          $inc: { stock: prev.quantity, soldCount: -prev.quantity },
-        });
-      }
-      // Delete the order
-      await Order.findByIdAndDelete(order._id);
-      throw ApiError.badRequest(`"${item.name}" stock changed. Please try again.`);
-    }
+  // COD flow: take the stock now
+  const shortItem = await deductStock(order);
+  if (shortItem) {
+    await Order.findByIdAndDelete(order._id);
+    throw ApiError.badRequest(`"${shortItem}" stock changed. Please try again.`);
   }
 
-  // Clear cart
-  await Cart.findOneAndUpdate({ user: userId }, { items: [] });
-
-  // Update coupon usage
   if (coupon) {
-    await updateCouponUsage(coupon, userId);
+    await couponService.recordCouponUse(coupon.code, userId);
+    order.couponCounted = true;
   }
+  await order.save();
+
+  await removeOrderedFromCart(order);
+
+  // Confirmation email (non-blocking)
+  User.findById(userId)
+    .then((user) => {
+      if (user) sendOrderConfirmation(order, user.email).catch(() => {});
+    })
+    .catch(() => {});
 
   return { order };
-}
-
-/**
- * Update coupon usage counters.
- */
-async function updateCouponUsage(coupon, userId) {
-  coupon.usedCount += 1;
-  const userEntry = coupon.usedBy.find((u) => u.user.toString() === userId.toString());
-  if (userEntry) {
-    userEntry.count += 1;
-  } else {
-    coupon.usedBy.push({ user: userId, count: 1 });
-  }
-  await coupon.save();
 }
 
 /**
@@ -356,16 +420,48 @@ async function getOrderById(orderId, userId, isAdmin = false) {
     throw ApiError.badRequest('Invalid order ID');
   }
 
-  const order = await Order.findById(orderId).populate('user', 'name email phone');
+  const order = await Order.findById(orderId).populate('user', 'name email phone company gstin');
   if (!order) {
     throw ApiError.notFound('Order not found');
   }
 
-  if (!isAdmin && order.user._id.toString() !== userId.toString()) {
-    throw ApiError.forbidden('You can only view your own orders');
+  if (!isAdmin && (!order.user || order.user._id.toString() !== userId.toString())) {
+    // 404, not 403: do not reveal that someone else's order exists
+    throw ApiError.notFound('Order not found');
   }
 
   return order;
+}
+
+/**
+ * Cancel an order: shared by the customer and the admin.
+ * Puts the stock back, releases the coupon and flags a refund when the
+ * order was already paid online.
+ *
+ * @param {object} order - Order document
+ * @param {object} options - { reason, by, note }
+ */
+async function applyCancellation(order, { reason = '', by, note }) {
+  await restoreStock(order);
+
+  if (order.couponCounted) {
+    await couponService.releaseCouponUse(order.couponCode, order.user._id || order.user);
+    order.couponCounted = false;
+  }
+
+  order.orderStatus = 'cancelled';
+  order.cancelledAt = new Date();
+  order.cancelReason = reason;
+  order.statusHistory.push({ status: 'cancelled', note, at: new Date(), by });
+
+  // Paid online: the money has to go back
+  if (order.paymentStatus === 'paid' && order.paymentMethod === 'razorpay') {
+    order.paymentStatus = 'refund_pending';
+    sendAdminAlert(
+      `Refund Required — ${order.orderNumber}`,
+      `Order ${order.orderNumber} was cancelled after payment. Amount: ₹${order.totalAmount}. Please process the refund.`
+    ).catch(() => {}); // non-blocking
+  }
 }
 
 /**
@@ -385,35 +481,11 @@ async function cancelOrder(orderId, userId, reason = '') {
     );
   }
 
-  // Restock items if stock was already decremented (COD or paid online)
-  if (order.paymentMethod === 'cod' || order.paymentStatus === 'paid') {
-    for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.product, {
-        $inc: { stock: item.quantity, soldCount: -item.quantity },
-      });
-    }
-  }
-
-  order.orderStatus = 'cancelled';
-  order.cancelledAt = new Date();
-  order.cancelReason = reason;
-  order.statusHistory.push({
-    status: 'cancelled',
-    note: reason || 'Cancelled by customer',
-    at: new Date(),
+  await applyCancellation(order, {
+    reason,
     by: userId,
+    note: reason || 'Cancelled by customer',
   });
-
-  // If paid online, set paymentStatus to refund_pending
-  if (order.paymentStatus === 'paid' && order.paymentMethod === 'razorpay') {
-    order.paymentStatus = 'refund_pending';
-    // Notify admin
-    const { sendAdminAlert } = require('../../utils/email');
-    sendAdminAlert(
-      `Refund Required — ${order.orderNumber}`,
-      `Order ${order.orderNumber} has been cancelled by the customer after payment. Amount: ₹${order.totalAmount}. Please process the refund.`
-    ).catch(() => {}); // non-blocking
-  }
 
   await order.save();
   return order;
@@ -428,13 +500,16 @@ async function cancelOrder(orderId, userId, reason = '') {
  */
 async function getInvoice(orderId, userId, isAdmin = false) {
   const order = await getOrderById(orderId, userId, isAdmin);
+  const settings = await settingsService.getSettings();
 
   return {
     seller: {
-      name: 'Sahajanand Electronics and Refrigeration LLP',
-      gstNote: config.business.gstInclusive
+      name: settings.legalName || settings.storeName,
+      address: settings.address,
+      gstin: settings.gstin,
+      gstNote: order.gstInclusive
         ? 'All prices are inclusive of GST'
-        : 'GST applied at applicable rates',
+        : `GST charged at ${order.gstPercent}%`,
     },
     order: {
       orderNumber: order.orderNumber,
@@ -446,10 +521,13 @@ async function getInvoice(orderId, userId, isAdmin = false) {
     customer: {
       name: order.shippingAddress.fullName,
       phone: order.shippingAddress.phone,
+      company: order.user ? order.user.company : '',
+      gstin: order.user ? order.user.gstin : '',
       address: `${order.shippingAddress.line1}${order.shippingAddress.line2 ? ', ' + order.shippingAddress.line2 : ''}, ${order.shippingAddress.city}, ${order.shippingAddress.state} - ${order.shippingAddress.pincode}`,
     },
     items: order.items.map((item) => ({
       name: item.name,
+      model: item.model,
       sku: item.sku,
       quantity: item.quantity,
       price: item.price,
@@ -460,6 +538,7 @@ async function getInvoice(orderId, userId, isAdmin = false) {
       itemsTotal: order.itemsTotal,
       discount: order.discount,
       couponCode: order.couponCode,
+      taxAmount: order.taxAmount,
       deliveryCharge: order.deliveryCharge,
       totalAmount: order.totalAmount,
     },
@@ -468,9 +547,15 @@ async function getInvoice(orderId, userId, isAdmin = false) {
 
 module.exports = {
   checkout,
+  quote,
+  priceItems,
+  resolveItems,
   getMyOrders,
   getOrderById,
   cancelOrder,
+  applyCancellation,
+  deductStock,
+  restoreStock,
+  removeOrderedFromCart,
   getInvoice,
-  applyCoupon,
 };

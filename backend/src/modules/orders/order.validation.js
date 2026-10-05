@@ -14,7 +14,7 @@ const shippingAddressSchema = z.object({
 const checkoutSchema = z.object({
   addressId: z.string().optional(),
   shippingAddress: shippingAddressSchema.optional(),
-  couponCode: z.string().trim().optional(),
+  couponCode: z.string().trim().max(30).optional(),
   paymentMethod: z.enum(['razorpay', 'cod']),
   items: z
     .array(
@@ -23,6 +23,7 @@ const checkoutSchema = z.object({
         quantity: z.coerce.number().int().min(1).max(10),
       })
     )
+    .max(50)
     .optional(),
   notes: z.string().max(500).optional().default(''),
 }).refine(
@@ -30,8 +31,21 @@ const checkoutSchema = z.object({
   { message: 'Either addressId or shippingAddress is required', path: ['addressId'] }
 );
 
+const quoteSchema = z.object({
+  couponCode: z.string().trim().max(30).optional(),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.coerce.number().int().min(1).max(10),
+      })
+    )
+    .max(50)
+    .optional(),
+});
+
 const cancelOrderSchema = z.object({
   reason: z.string().trim().max(500).optional().default(''),
 });
 
-module.exports = { checkoutSchema, cancelOrderSchema };
+module.exports = { checkoutSchema, quoteSchema, cancelOrderSchema };

@@ -5,6 +5,7 @@ const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const morgan = require('morgan');
+const path = require('path');
 
 const config = require('./config/env');
 const routes = require('./routes');
@@ -19,7 +20,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 // 2. Security headers & compression
-app.use(helmet());
+// The API serves JSON and uploaded images to the storefront on another origin
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(compression());
 
 // 3. CORS — allow configured client URLs + no-origin for server-to-server/webhooks
@@ -43,6 +45,18 @@ app.post(
   '/api/payments/webhook',
   express.raw({ type: 'application/json' }),
   paymentController.webhook
+);
+
+// Uploaded images (used when Cloudinary is not configured). Only image files
+// written by the upload middleware live here; nothing is executed.
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, '..', 'uploads'), {
+    index: false,
+    dotfiles: 'ignore',
+    maxAge: '7d',
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  })
 );
 
 // 5. Body parsers

@@ -1,4 +1,7 @@
-const { Payment, Order, Product, Cart, User } = require('../../models');
+const mongoose = require('mongoose');
+const { Payment, Order, User } = require('../../models');
+const orderService = require('../orders/order.service');
+const couponService = require('../coupons/coupon.service');
 const razorpayService = require('../../integrations/razorpay/razorpay.service');
 const config = require('../../config/env');
 const ApiError = require('../../utils/ApiError');
@@ -78,25 +81,45 @@ async function finalizePaidOrder(order, paymentDetails) {
     return order;
   }
 
+  // A cancelled order that gets paid afterwards (late webhook) must not be
+  // revived: record the payment and flag it for a refund.
+  if (order.orderStatus === 'cancelled') {
+    order.paymentStatus = 'refund_pending';
+    order.needsAttention = true;
+    order.statusHistory.push({
+      status: 'cancelled',
+      note: 'ATTENTION: Payment received after cancellation. Refund required.',
+      at: new Date(),
+    });
+    await order.save();
+    await Payment.findOneAndUpdate(
+      { razorpayOrderId: order.razorpayOrderId },
+      { status: 'captured', razorpayPaymentId: paymentDetails.razorpayPaymentId }
+    );
+    sendAdminAlert(
+      `Refund Required — ${order.orderNumber}`,
+      `Order ${order.orderNumber} was paid after it had been cancelled. Amount: ₹${order.totalAmount}.`
+    ).catch(() => {});
+    return order;
+  }
+
   let hasStockIssue = false;
   const stockNotes = [];
 
-  // Decrement stock atomically for each item
-  for (const item of order.items) {
-    const result = await Product.findOneAndUpdate(
-      { _id: item.product, stock: { $gte: item.quantity } },
-      { $inc: { stock: -item.quantity, soldCount: item.quantity } },
-      { new: true }
+  // Take the items out of stock (all or nothing)
+  const shortItem = await orderService.deductStock(order);
+  if (shortItem) {
+    // Insufficient stock but payment is received — flag for admin
+    hasStockIssue = true;
+    stockNotes.push(`"${shortItem}" — insufficient stock`);
+    logger.warn(
+      `Order ${order.orderNumber}: insufficient stock for "${shortItem}" — paid order needs attention`
     );
+  }
 
-    if (!result) {
-      // Insufficient stock but payment is received — flag for admin
-      hasStockIssue = true;
-      stockNotes.push(`"${item.name}" (qty: ${item.quantity}) — insufficient stock`);
-      logger.warn(
-        `Order ${order.orderNumber}: insufficient stock for product ${item.product} — paid order needs attention`
-      );
-    }
+  if (order.couponCode && !order.couponCounted) {
+    await couponService.recordCouponUse(order.couponCode, order.user);
+    order.couponCounted = true;
   }
 
   // Mark order as paid
@@ -137,8 +160,8 @@ async function finalizePaidOrder(order, paymentDetails) {
     }
   );
 
-  // Clear user's cart (non-blocking)
-  Cart.findOneAndUpdate({ user: order.user }, { items: [] }).catch(() => {});
+  // Remove the purchased items from the cart (non-blocking)
+  orderService.removeOrderedFromCart(order).catch(() => {});
 
   // Send confirmation email (non-blocking)
   User.findById(order.user)
@@ -166,11 +189,16 @@ async function handlePaymentFailed(userId, body) {
     throw ApiError.notFound('Order not found');
   }
 
+  // A late "failed" report must never undo a payment that went through
+  if (order.paymentStatus !== 'pending') {
+    return order;
+  }
+
   order.paymentStatus = 'failed';
   await order.save();
 
   await Payment.findOneAndUpdate(
-    { razorpayOrderId: razorpay_order_id },
+    { razorpayOrderId: razorpay_order_id, status: 'created' },
     { status: 'failed' }
   );
 
@@ -184,6 +212,10 @@ async function handlePaymentFailed(userId, body) {
  * @returns {Promise<object>}
  */
 async function retryPayment(userId, orderId) {
+  if (!mongoose.isValidObjectId(orderId)) {
+    throw ApiError.badRequest('Invalid order ID');
+  }
+
   const order = await Order.findOne({ _id: orderId, user: userId });
   if (!order) {
     throw ApiError.notFound('Order not found');
@@ -193,7 +225,7 @@ async function retryPayment(userId, orderId) {
     throw ApiError.badRequest('Only online payment orders can be retried');
   }
 
-  if (order.paymentStatus === 'paid') {
+  if (!['pending', 'failed'].includes(order.paymentStatus)) {
     throw ApiError.badRequest('This order is already paid');
   }
 
@@ -298,6 +330,8 @@ async function handleWebhook(rawBody, signature) {
     }
 
     case 'payment.failed': {
+      // Ignore a failed attempt on an order that was paid by another attempt
+      if (order.paymentStatus !== 'pending') break;
       order.paymentStatus = 'failed';
       await order.save();
       if (payment) {
@@ -359,6 +393,10 @@ async function processRefund(orderId, amount, adminId) {
     throw ApiError.badRequest('No captured payment found for this order');
   }
 
+  if (amount > order.totalAmount) {
+    throw ApiError.badRequest('Refund amount cannot be more than the order total');
+  }
+
   const refundAmountPaise = amount ? Math.round(amount * 100) : 0;
   const refund = await razorpayService.refundPayment(
     payment.razorpayPaymentId,
@@ -367,7 +405,12 @@ async function processRefund(orderId, amount, adminId) {
 
   // Update records
   order.paymentStatus = 'refunded';
-  order.orderStatus = 'cancelled';
+  if (order.orderStatus !== 'cancelled') {
+    await orderService.restoreStock(order);
+    order.orderStatus = 'cancelled';
+    order.cancelledAt = new Date();
+    order.cancelReason = 'Refunded by admin';
+  }
   order.statusHistory.push({
     status: 'refunded',
     note: `Refund initiated by admin. Refund ID: ${refund.id}`,

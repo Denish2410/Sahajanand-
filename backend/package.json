@@ -12,9 +12,15 @@
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
     "lint": "eslint src/ tests/ --ext .js",
     "lint:fix": "eslint src/ tests/ --ext .js --fix",
-    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\""
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\"",
+    "seed:demo": "node scripts/seed.js --demo",
+    "make-admin": "node scripts/make-admin.js"
   },
-  "keywords": ["ecommerce", "electronics", "api"],
+  "keywords": [
+    "ecommerce",
+    "electronics",
+    "api"
+  ],
   "author": "Sahajanand Electronics and Refrigeration LLP",
   "license": "ISC",
   "dependencies": {
@@ -55,6 +61,10 @@
       "src/**/*.js",
       "!src/server.js",
       "!src/config/**"
-    ]
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/env.js"
+    ],
+    "maxWorkers": 2
   }
 }

@@ -1,14 +1,27 @@
-const cloudinary = require('../../config/cloudinary');
 const fs = require('fs');
+const path = require('path');
+const cloudinary = require('../../config/cloudinary');
+const config = require('../../config/env');
 const logger = require('../../utils/logger');
+const { UPLOADS_DIR } = require('../../middleware/upload.middleware');
+
+// Images go to Cloudinary when it is configured. Without it they stay in the
+// local uploads directory and are served from /uploads (fine for development;
+// use Cloudinary on hosts with an ephemeral disk).
+const LOCAL_PREFIX = 'local:';
 
 /**
- * Upload a file to Cloudinary.
- * @param {string} filePath - Local file path
+ * Store an uploaded image.
+ * @param {string} filePath - Local file path written by multer
  * @param {string} folder - Cloudinary folder
  * @returns {Promise<{url: string, publicId: string}>}
  */
 async function uploadImage(filePath, folder = 'sahajanand') {
+  if (!config.cloudinary.enabled) {
+    const name = path.basename(filePath);
+    return { url: `${config.publicApiUrl}/uploads/${name}`, publicId: `${LOCAL_PREFIX}${name}` };
+  }
+
   try {
     const result = await cloudinary.uploader.upload(filePath, {
       folder,
@@ -34,7 +47,7 @@ async function uploadImage(filePath, folder = 'sahajanand') {
 }
 
 /**
- * Upload multiple files to Cloudinary.
+ * Upload multiple files.
  * @param {string[]} filePaths - Array of local file paths
  * @param {string} folder - Cloudinary folder
  * @returns {Promise<Array<{url: string, publicId: string}>>}
@@ -49,10 +62,21 @@ async function uploadMultipleImages(filePaths, folder = 'sahajanand') {
 }
 
 /**
- * Delete an image from Cloudinary by public ID.
+ * Delete a stored image by public ID. Images without a public ID (catalogue
+ * images referenced by URL) have nothing to delete.
  * @param {string} publicId
  */
 async function deleteImage(publicId) {
+  if (!publicId) return;
+
+  if (publicId.startsWith(LOCAL_PREFIX)) {
+    // basename() keeps the delete inside the uploads directory
+    deleteTempFile(path.join(UPLOADS_DIR, path.basename(publicId.slice(LOCAL_PREFIX.length))));
+    return;
+  }
+
+  if (!config.cloudinary.enabled) return;
+
   try {
     await cloudinary.uploader.destroy(publicId);
     logger.info(`Cloudinary image deleted: ${publicId}`);
@@ -62,7 +86,7 @@ async function deleteImage(publicId) {
 }
 
 /**
- * Delete multiple images from Cloudinary.
+ * Delete multiple images.
  * @param {string[]} publicIds
  */
 async function deleteMultipleImages(publicIds) {

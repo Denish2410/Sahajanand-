@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { ROLES } = require('../utils/roles');
 
 const userSchema = new mongoose.Schema(
   {
@@ -26,14 +27,28 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    company: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 150,
+    },
+    gstin: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: '',
+      maxlength: 15,
+    },
     photoURL: {
       type: String,
       default: '',
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
-      default: 'user',
+      enum: Object.values(ROLES),
+      default: ROLES.USER,
+      index: true,
     },
     isActive: {
       type: Boolean,

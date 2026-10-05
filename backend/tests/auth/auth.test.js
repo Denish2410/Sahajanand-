@@ -43,7 +43,7 @@ describe('Auth Module', () => {
       expect(dbUser.email).toBe('test@example.com');
     });
 
-    it('should upsert existing user on subsequent login', async () => {
+    it('should keep the profile name the customer edited on subsequent login', async () => {
       // Create user first
       await User.create({
         firebaseUid: 'firebase-uid-123',
@@ -65,7 +65,11 @@ describe('Auth Module', () => {
         .set('Authorization', 'Bearer valid-token-123');
 
       expect(res.status).toBe(200);
-      expect(res.body.data.user.name).toBe('Updated Name');
+      // The name is the customer's to edit (PUT /users/profile); a new login
+      // must not overwrite it with whatever the sign-in provider holds.
+      expect(res.body.data.user.name).toBe('Old Name');
+      expect(res.body.data.user.photoURL).toBe('https://new-photo.url');
+      expect(res.body.data.user.emailVerified).toBe(true);
     });
 
     it('should assign admin role if email is in ADMIN_EMAILS', async () => {

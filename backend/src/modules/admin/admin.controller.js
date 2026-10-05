@@ -4,8 +4,13 @@ const categoryService = require('../categories/category.service');
 const couponService = require('../coupons/coupon.service');
 const reviewService = require('../reviews/review.service');
 const paymentService = require('../payments/payment.service');
+const orderService = require('../orders/order.service');
+const enquiryService = require('../enquiries/enquiry.service');
+const bannerService = require('../banners/banner.service');
+const settingsService = require('../settings/settings.service');
 const asyncHandler = require('../../utils/asyncHandler');
 const ApiResponse = require('../../utils/ApiResponse');
+const ApiError = require('../../utils/ApiError');
 
 // ─── Dashboard ───────────────────────────────────────────
 const getDashboard = asyncHandler(async (_req, res) => {
@@ -15,7 +20,11 @@ const getDashboard = asyncHandler(async (_req, res) => {
 
 // ─── Products ────────────────────────────────────────────
 const getProducts = asyncHandler(async (req, res) => {
-  const { products, meta } = await productService.listProducts(req.query, true);
+  const settings = await settingsService.getSettings();
+  const { products, meta } = await productService.listProducts(
+    { ...req.query, lowStockThreshold: settings.lowStockThreshold },
+    true
+  );
   return ApiResponse(res, 200, 'Products fetched', { products }, meta);
 });
 
@@ -35,8 +44,13 @@ const updateProduct = asyncHandler(async (req, res) => {
 });
 
 const deleteProduct = asyncHandler(async (req, res) => {
-  await productService.deleteProduct(req.params.id);
-  return ApiResponse(res, 200, 'Product deleted');
+  const { archived } = await productService.deleteProduct(req.params.id);
+  return ApiResponse(
+    res,
+    200,
+    archived ? 'Product has orders, so it was archived (hidden from the store) instead of deleted' : 'Product deleted',
+    { archived }
+  );
 });
 
 const updateStock = asyncHandler(async (req, res) => {
@@ -51,15 +65,20 @@ const toggleProduct = asyncHandler(async (req, res) => {
 
 const uploadImages = asyncHandler(async (req, res) => {
   if (!req.files || req.files.length === 0) {
-    return ApiResponse(res, 400, 'No images uploaded');
+    throw ApiError.badRequest('No images uploaded');
   }
   const product = await productService.uploadImages(req.params.id, req.files);
   return ApiResponse(res, 200, 'Images uploaded', { product });
 });
 
 const deleteImage = asyncHandler(async (req, res) => {
-  await productService.deleteImage(req.params.id, req.params.publicId);
-  return ApiResponse(res, 200, 'Image deleted');
+  const product = await productService.deleteImage(req.params.id, req.params.imageId);
+  return ApiResponse(res, 200, 'Image deleted', { product });
+});
+
+const reorderImages = asyncHandler(async (req, res) => {
+  const product = await productService.reorderImages(req.params.id, req.body.order);
+  return ApiResponse(res, 200, 'Image order saved', { product });
 });
 
 // ─── Categories ──────────────────────────────────────────
@@ -95,9 +114,8 @@ const getOrders = asyncHandler(async (req, res) => {
 });
 
 const getOrder = asyncHandler(async (req, res) => {
-  const orderService = require('../orders/order.service');
   const order = await orderService.getOrderById(req.params.id, req.user._id, true);
-  return ApiResponse(res, 200, 'Order fetched', { order });
+  return ApiResponse(res, 200, 'Order fetched', { order, allowedStatuses: adminService.VALID_TRANSITIONS[order.orderStatus] || [] });
 });
 
 const updateOrderStatus = asyncHandler(async (req, res) => {
@@ -112,6 +130,11 @@ const updatePaymentStatus = asyncHandler(async (req, res) => {
     req.user._id
   );
   return ApiResponse(res, 200, 'Payment status updated', { order });
+});
+
+const resolveAttention = asyncHandler(async (req, res) => {
+  const order = await adminService.resolveAttention(req.params.id, req.user._id);
+  return ApiResponse(res, 200, 'Order marked as resolved', { order });
 });
 
 const refundOrder = asyncHandler(async (req, res) => {
@@ -135,16 +158,12 @@ const getUser = asyncHandler(async (req, res) => {
 });
 
 const updateUserRole = asyncHandler(async (req, res) => {
-  const user = await adminService.updateUserRole(req.params.id, req.body.role, req.user._id);
+  const user = await adminService.updateUserRole(req.params.id, req.body.role, req.user);
   return ApiResponse(res, 200, 'User role updated', { user });
 });
 
 const updateUserStatus = asyncHandler(async (req, res) => {
-  const user = await adminService.updateUserStatus(
-    req.params.id,
-    req.body.isActive,
-    req.user._id
-  );
+  const user = await adminService.updateUserStatus(req.params.id, req.body.isActive, req.user);
   return ApiResponse(res, 200, `User ${user.isActive ? 'activated' : 'deactivated'}`, { user });
 });
 
@@ -196,14 +215,77 @@ const getPayments = asyncHandler(async (req, res) => {
   return ApiResponse(res, 200, 'Payments fetched', { payments }, meta);
 });
 
+// ─── Enquiries ───────────────────────────────────────────
+const getEnquiries = asyncHandler(async (req, res) => {
+  const { enquiries, meta } = await enquiryService.listEnquiries(req.query);
+  return ApiResponse(res, 200, 'Enquiries fetched', { enquiries }, meta);
+});
+
+const getEnquiry = asyncHandler(async (req, res) => {
+  const enquiry = await enquiryService.getEnquiryById(req.params.id);
+  return ApiResponse(res, 200, 'Enquiry fetched', { enquiry });
+});
+
+const updateEnquiry = asyncHandler(async (req, res) => {
+  const enquiry = await enquiryService.updateEnquiry(req.params.id, req.body);
+  return ApiResponse(res, 200, 'Enquiry updated', { enquiry });
+});
+
+const deleteEnquiry = asyncHandler(async (req, res) => {
+  await enquiryService.deleteEnquiry(req.params.id);
+  return ApiResponse(res, 200, 'Enquiry deleted');
+});
+
+// ─── Banners ─────────────────────────────────────────────
+const getBanners = asyncHandler(async (_req, res) => {
+  const banners = await bannerService.listBanners();
+  return ApiResponse(res, 200, 'Banners fetched', { banners });
+});
+
+const createBanner = asyncHandler(async (req, res) => {
+  const banner = await bannerService.createBanner(req.body);
+  return ApiResponse(res, 201, 'Banner created', { banner });
+});
+
+const updateBanner = asyncHandler(async (req, res) => {
+  const banner = await bannerService.updateBanner(req.params.id, req.body);
+  return ApiResponse(res, 200, 'Banner updated', { banner });
+});
+
+const deleteBanner = asyncHandler(async (req, res) => {
+  await bannerService.deleteBanner(req.params.id);
+  return ApiResponse(res, 200, 'Banner deleted');
+});
+
+// ─── Settings ────────────────────────────────────────────
+const getSettings = asyncHandler(async (_req, res) => {
+  const settings = await settingsService.getPublicSettings();
+  return ApiResponse(res, 200, 'Settings fetched', { settings });
+});
+
+const updateSettings = asyncHandler(async (req, res) => {
+  const settings = await settingsService.updateSettings(req.body);
+  return ApiResponse(res, 200, 'Settings saved', { settings });
+});
+
+// ─── Activity ────────────────────────────────────────────
+const getActivity = asyncHandler(async (req, res) => {
+  const { activity, meta } = await adminService.listActivity(req.query);
+  return ApiResponse(res, 200, 'Activity fetched', { activity }, meta);
+});
+
 module.exports = {
   getDashboard,
   getProducts, createProduct, getProduct, updateProduct, deleteProduct,
-  updateStock, toggleProduct, uploadImages, deleteImage,
+  updateStock, toggleProduct, uploadImages, deleteImage, reorderImages,
   getCategories, createCategory, getCategory, updateCategory, deleteCategory,
-  getOrders, getOrder, updateOrderStatus, updatePaymentStatus, refundOrder,
+  getOrders, getOrder, updateOrderStatus, updatePaymentStatus, resolveAttention, refundOrder,
   getUsers, getUser, updateUserRole, updateUserStatus,
   getCoupons, getCoupon, createCoupon, updateCoupon, deleteCoupon,
   getReviews, toggleReviewApproval, deleteReview,
   getPayments,
+  getEnquiries, getEnquiry, updateEnquiry, deleteEnquiry,
+  getBanners, createBanner, updateBanner, deleteBanner,
+  getSettings, updateSettings,
+  getActivity,
 };

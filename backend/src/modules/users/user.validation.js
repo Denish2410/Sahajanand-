@@ -8,6 +8,14 @@ const updateProfileSchema = z.object({
     .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number')
     .optional()
     .or(z.literal('')),
+  company: z.string().trim().max(150).optional(),
+  gstin: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[0-9A-Z]{15}$/, 'GSTIN must be 15 letters and digits')
+    .optional()
+    .or(z.literal('')),
 });
 
 module.exports = { updateProfileSchema };

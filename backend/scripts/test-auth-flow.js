@@ -1,8 +1,12 @@
-const config = require('../src/config/env');
 
 // The Firebase Web API Key is required to call the Firebase REST APIs.
 // This is different from the Firebase Admin SDK private key.
-const FIREBASE_API_KEY = "AIzaSyCkS5HdPgsUhagazk6ZfO_CS_gfMiehb1w"; // Extracted from your .env comments
+// Pass it in the environment: FIREBASE_WEB_API_KEY=... node scripts/test-auth-flow.js
+const FIREBASE_API_KEY = process.env.FIREBASE_WEB_API_KEY;
+if (!FIREBASE_API_KEY) {
+  console.error('Set FIREBASE_WEB_API_KEY (Firebase Console → Project settings → Web API key).');
+  process.exit(1);
+}
 
 const TEST_EMAIL = "test_user_api@example.com";
 const TEST_PASSWORD = "Password123!";

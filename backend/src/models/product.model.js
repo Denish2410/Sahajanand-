@@ -9,6 +9,13 @@ const productSchema = new mongoose.Schema(
       trim: true,
       maxlength: 200,
     },
+    // Manufacturer model number, e.g. "EGN 1500 C4"
+    model: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 100,
+    },
     slug: {
       type: String,
       unique: true,
@@ -38,10 +45,36 @@ const productSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    subcategory: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 100,
+    },
+    // Products of one series share a family and are listed as variants
+    familyId: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true,
+    },
+    familyName: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 200,
+    },
     price: {
       type: Number,
       required: true,
       min: 0,
+    },
+    // 'confirmed' = set by the store; 'listed' / 'indicative' = imported
+    // reference prices that still need confirming.
+    priceSource: {
+      type: String,
+      enum: ['confirmed', 'listed', 'indicative'],
+      default: 'confirmed',
     },
     mrp: {
       type: Number,
@@ -69,7 +102,8 @@ const productSchema = new mongoose.Schema(
     images: [
       {
         url: { type: String, required: true },
-        publicId: { type: String, required: true },
+        // Empty for catalogue images referenced by URL (nothing to delete)
+        publicId: { type: String, default: '' },
       },
     ],
     specs: [
@@ -84,6 +118,37 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
     features: [{ type: String, trim: true }],
+    applications: [{ type: String, trim: true }],
+    badges: [{ type: String, trim: true }],
+    // Operating temperature range in °C
+    temp: {
+      min: { type: Number },
+      max: { type: Number },
+    },
+    tempClass: {
+      type: String,
+      enum: ['', 'Ultra-low', 'Freezer', 'Dual / convertible', 'Chiller', 'Heated'],
+      default: '',
+    },
+    capacityL: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    refrigerant: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    cooling: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    sortOrder: {
+      type: Number,
+      default: 0,
+    },
     tags: [{ type: String, trim: true, lowercase: true }],
     isFeatured: {
       type: Boolean,
@@ -123,6 +188,9 @@ const productSchema = new mongoose.Schema(
 
 // Validate price <= mrp
 productSchema.pre('validate', function (next) {
+  // An empty SKU must be stored as "missing": the unique sparse index would
+  // otherwise let only one product exist without a SKU.
+  if (this.sku === '') this.sku = undefined;
   if (this.price > this.mrp) {
     this.invalidate('price', 'Price cannot be greater than MRP');
   }
@@ -138,9 +206,10 @@ productSchema.pre('save', async function (next) {
     this.discountPercent = 0;
   }
 
-  // Generate slug
-  if (this.isModified('name') || !this.slug) {
-    let baseSlug = slugify(this.name, { lower: true, strict: true });
+  // Generate the slug once, from the model number when there is one. It is
+  // kept on rename so product links stay valid.
+  if (!this.slug) {
+    let baseSlug = slugify(this.model || this.name, { lower: true, strict: true }) || 'product';
     let slug = baseSlug;
     let counter = 1;
 
@@ -162,8 +231,8 @@ productSchema.pre('save', async function (next) {
 
 // Text index for search
 productSchema.index(
-  { name: 'text', brand: 'text', description: 'text', tags: 'text' },
-  { weights: { name: 10, brand: 5, tags: 3, description: 1 } }
+  { name: 'text', model: 'text', brand: 'text', subcategory: 'text', description: 'text', tags: 'text' },
+  { weights: { model: 12, name: 10, brand: 5, subcategory: 4, tags: 3, description: 1 } }
 );
 
 // Compound indexes
@@ -171,6 +240,7 @@ productSchema.index({ category: 1, price: 1 });
 productSchema.index({ isActive: 1, isFeatured: 1 });
 productSchema.index({ isActive: 1, createdAt: -1 });
 productSchema.index({ isActive: 1, soldCount: -1 });
+productSchema.index({ isActive: 1, stock: 1 });
 
 const Product = mongoose.model('Product', productSchema);
 

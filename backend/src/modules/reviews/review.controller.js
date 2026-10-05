@@ -1,6 +1,7 @@
 const reviewService = require('./review.service');
 const asyncHandler = require('../../utils/asyncHandler');
 const ApiResponse = require('../../utils/ApiResponse');
+const { isStaff } = require('../../utils/roles');
 
 const getProductReviews = asyncHandler(async (req, res) => {
   const { reviews, ratingBreakdown, meta } = await reviewService.getProductReviews(
@@ -25,7 +26,7 @@ const updateReview = asyncHandler(async (req, res) => {
 });
 
 const deleteReview = asyncHandler(async (req, res) => {
-  await reviewService.deleteReview(req.params.id, req.user._id, req.user.role === 'admin');
+  await reviewService.deleteReview(req.params.id, req.user._id, isStaff(req.user));
   return ApiResponse(res, 200, 'Review deleted');
 });
 
