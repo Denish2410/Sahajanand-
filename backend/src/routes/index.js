@@ -13,6 +13,9 @@ const reviewRoutes = require('../modules/reviews/review.routes');
 const orderRoutes = require('../modules/orders/order.routes');
 const paymentRoutes = require('../modules/payments/payment.routes');
 const adminRoutes = require('../modules/admin/admin.routes');
+const enquiryRoutes = require('../modules/enquiries/enquiry.routes');
+const bannerRoutes = require('../modules/banners/banner.routes');
+const settingsRoutes = require('../modules/settings/settings.routes');
 
 const router = Router();
 
@@ -42,6 +45,9 @@ router.use('/coupons', couponRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/orders', orderRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/enquiries', enquiryRoutes);
+router.use('/banners', bannerRoutes);
+router.use('/settings', settingsRoutes);
 router.use('/admin', adminRoutes);
 
 module.exports = router;

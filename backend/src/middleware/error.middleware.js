@@ -20,6 +20,26 @@ const errorHandler = (err, _req, res, _next) => {
   let message = err.message || 'Internal server error';
   let errors = err.errors || [];
 
+  // Origin not on the allow-list
+  if (typeof err.message === 'string' && err.message.startsWith('CORS:')) {
+    statusCode = 403;
+    message = 'Origin not allowed';
+    errors = [];
+  }
+
+  // Malformed JSON body
+  if (err.type === 'entity.parse.failed') {
+    statusCode = 400;
+    message = 'Invalid JSON in request body';
+    errors = [];
+  }
+
+  if (err.type === 'entity.too.large') {
+    statusCode = 413;
+    message = 'Request body is too large';
+    errors = [];
+  }
+
   // Zod validation errors
   if (err instanceof ZodError) {
     statusCode = 400;
@@ -69,15 +89,21 @@ const errorHandler = (err, _req, res, _next) => {
     errors = [];
   }
 
-  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+  if (err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT') {
     statusCode = 400;
-    message = 'Unexpected file field';
+    message = 'Too many files, or an unexpected file field';
+    errors = [];
+  }
+
+  // Never show internals for unexpected server errors
+  if (statusCode >= 500 && !err.isOperational) {
+    message = 'Something went wrong on our side. Please try again.';
     errors = [];
   }
 
   // Log errors
   if (statusCode >= 500) {
-    logger.error(`[${statusCode}] ${message}`, { stack: err.stack });
+    logger.error(`[${statusCode}] ${err.message}`, { stack: err.stack });
   } else {
     logger.warn(`[${statusCode}] ${message}`);
   }
@@ -91,8 +117,8 @@ const errorHandler = (err, _req, res, _next) => {
     response.errors = errors;
   }
 
-  // Never leak stack traces in production
-  if (!config.isProduction && err.stack) {
+  // Stack traces only while developing locally, never in production
+  if (config.env === 'development' && statusCode >= 500 && err.stack) {
     response.stack = err.stack;
   }
 

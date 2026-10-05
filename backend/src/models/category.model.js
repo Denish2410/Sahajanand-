@@ -15,6 +15,18 @@ const categorySchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    shortName: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 40,
+    },
+    tagline: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 120,
+    },
     description: {
       type: String,
       trim: true,
@@ -24,6 +36,17 @@ const categorySchema = new mongoose.Schema(
     image: {
       url: { type: String, default: '' },
       publicId: { type: String, default: '' },
+    },
+    // Wide banner photo behind the category page header
+    scene: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    subcategories: [{ type: String, trim: true }],
+    isFeatured: {
+      type: Boolean,
+      default: false,
     },
     parent: {
       type: mongoose.Schema.Types.ObjectId,
@@ -50,9 +73,10 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
-// Generate slug before saving
+// Generate the slug once. It is kept when the category is renamed so that
+// existing links and search results keep working.
 categorySchema.pre('save', async function (next) {
-  if (this.isModified('name') || !this.slug) {
+  if (!this.slug) {
     let baseSlug = slugify(this.name, { lower: true, strict: true });
     let slug = baseSlug;
     let counter = 1;

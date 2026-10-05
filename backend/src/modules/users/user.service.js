@@ -28,6 +28,8 @@ async function updateProfile(userId, data) {
 
   if (data.name !== undefined) user.name = data.name;
   if (data.phone !== undefined) user.phone = data.phone;
+  if (data.company !== undefined) user.company = data.company;
+  if (data.gstin !== undefined) user.gstin = data.gstin;
 
   await user.save();
   return user;

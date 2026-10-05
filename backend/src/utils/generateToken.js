@@ -17,14 +17,4 @@ function generateOrderNumber() {
   return `SEL-${dateStr}-${random}`;
 }
 
-/**
- * Generate a random hex token of the specified byte length.
- *
- * @param {number} [bytes=32] - Number of random bytes
- * @returns {string} Hex-encoded token
- */
-function generateRandomToken(bytes = 32) {
-  return crypto.randomBytes(bytes).toString('hex');
-}
-
-module.exports = { generateOrderNumber, generateRandomToken };
+module.exports = { generateOrderNumber };

@@ -1,7 +1,14 @@
 const crypto = require('crypto');
-const razorpay = require('./razorpay.client');
+const razorpay = require('../../config/razorpay');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
+const ApiError = require('../../utils/ApiError');
+
+function assertConfigured() {
+  if (!razorpay) {
+    throw new ApiError(503, 'Online payment is not configured');
+  }
+}
 
 /**
  * Create a Razorpay order.
@@ -12,6 +19,7 @@ const logger = require('../../utils/logger');
  * @returns {Promise<object>} Razorpay order object
  */
 async function createOrder({ amount, receipt, notes = {} }) {
+  assertConfigured();
   const order = await razorpay.orders.create({
     amount,
     currency: 'INR',
@@ -32,6 +40,7 @@ async function createOrder({ amount, receipt, notes = {} }) {
  * @returns {boolean}
  */
 function verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature) {
+  if (!config.razorpay.enabled) return false;
   const body = `${razorpayOrderId}|${razorpayPaymentId}`;
   const expectedSignature = crypto
     .createHmac('sha256', config.razorpay.keySecret)
@@ -55,6 +64,7 @@ function verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature) 
  * @returns {boolean}
  */
 function verifyWebhookSignature(rawBody, signature) {
+  if (!config.razorpay.enabled) return false;
   const expectedSignature = crypto
     .createHmac('sha256', config.razorpay.webhookSecret)
     .update(rawBody)
@@ -77,6 +87,7 @@ function verifyWebhookSignature(rawBody, signature) {
  * @returns {Promise<object>} Refund object
  */
 async function refundPayment(paymentId, amount = 0) {
+  assertConfigured();
   const refundData = {};
   if (amount > 0) {
     refundData.amount = amount;
@@ -86,19 +97,9 @@ async function refundPayment(paymentId, amount = 0) {
   return refund;
 }
 
-/**
- * Fetch a payment from Razorpay.
- * @param {string} paymentId - Razorpay payment ID
- * @returns {Promise<object>}
- */
-async function fetchPayment(paymentId) {
-  return await razorpay.payments.fetch(paymentId);
-}
-
 module.exports = {
   createOrder,
   verifySignature,
   verifyWebhookSignature,
   refundPayment,
-  fetchPayment,
 };

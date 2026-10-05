@@ -2,13 +2,20 @@ const { Router } = require('express');
 const orderController = require('./order.controller');
 const { verifyToken } = require('../../middleware/auth.middleware');
 const { validate } = require('../../middleware/validation.middleware');
-const { checkoutSchema, cancelOrderSchema } = require('./order.validation');
+const { checkoutSchema, quoteSchema, cancelOrderSchema } = require('./order.validation');
+const { checkoutLimiter } = require('../../middleware/rateLimit.middleware');
 
 const router = Router();
 
 router.use(verifyToken);
 
-router.post('/checkout', validate({ body: checkoutSchema }), orderController.checkout);
+router.post('/quote', validate({ body: quoteSchema }), orderController.quote);
+router.post(
+  '/checkout',
+  checkoutLimiter,
+  validate({ body: checkoutSchema }),
+  orderController.checkout
+);
 router.get('/my', orderController.getMyOrders);
 router.get('/:id', orderController.getOrderById);
 router.post('/:id/cancel', validate({ body: cancelOrderSchema }), orderController.cancelOrder);

@@ -40,10 +40,10 @@ const getBrands = asyncHandler(async (_req, res) => {
  * GET /api/products/:slug — single product by slug with related products.
  */
 const getProductBySlug = asyncHandler(async (req, res) => {
-  const { product, relatedProducts } = await productService.getProductBySlug(
+  const { product, relatedProducts, variants } = await productService.getProductBySlug(
     req.params.slug
   );
-  return ApiResponse(res, 200, 'Product fetched', { product, relatedProducts });
+  return ApiResponse(res, 200, 'Product fetched', { product, relatedProducts, variants });
 });
 
 /**

@@ -2,6 +2,8 @@ const { Cart, Product } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const mongoose = require('mongoose');
 
+const MAX_PER_ITEM = 10;
+
 /**
  * Get cart for a user, populated with current product data.
  * Adds computed fields: subtotal, outOfStock, quantityExceedsStock per item.
@@ -12,7 +14,7 @@ const mongoose = require('mongoose');
 async function getCart(userId) {
   let cart = await Cart.findOne({ user: userId }).populate({
     path: 'items.product',
-    select: 'name slug price mrp stock images isActive discountPercent',
+    select: 'name model slug price mrp stock images isActive discountPercent category',
   });
 
   if (!cart) {
@@ -72,11 +74,22 @@ async function addItem(userId, productId, quantity = 1) {
     (item) => item.product.toString() === productId
   );
 
+  // Never let the cart hold more than is in stock, or more than 10 of one item
+  const limit = Math.min(product.stock, MAX_PER_ITEM);
+  const current = existingIndex >= 0 ? cart.items[existingIndex].quantity : 0;
+  if (current >= limit) {
+    throw ApiError.badRequest(
+      product.stock < MAX_PER_ITEM
+        ? `Only ${product.stock} of "${product.model || product.name}" in stock`
+        : `You can order up to ${MAX_PER_ITEM} of one product online. Request a quote for larger quantities.`
+    );
+  }
+  const newQty = Math.min(current + quantity, limit);
+
   if (existingIndex >= 0) {
-    const newQty = cart.items[existingIndex].quantity + quantity;
-    cart.items[existingIndex].quantity = Math.min(newQty, 10);
+    cart.items[existingIndex].quantity = newQty;
   } else {
-    cart.items.push({ product: productId, quantity: Math.min(quantity, 10) });
+    cart.items.push({ product: productId, quantity: newQty });
   }
 
   await cart.save();
@@ -101,8 +114,13 @@ async function updateItem(userId, productId, quantity) {
     throw ApiError.notFound('Item not found in cart');
   }
 
-  if (quantity < 1 || quantity > 10) {
-    throw ApiError.badRequest('Quantity must be between 1 and 10');
+  if (quantity < 1 || quantity > MAX_PER_ITEM) {
+    throw ApiError.badRequest(`Quantity must be between 1 and ${MAX_PER_ITEM}`);
+  }
+
+  const product = await Product.findById(productId).select('stock name model');
+  if (product && quantity > item.quantity && quantity > product.stock) {
+    throw ApiError.badRequest(`Only ${product.stock} of "${product.model || product.name}" in stock`);
   }
 
   item.quantity = quantity;
@@ -119,7 +137,7 @@ async function updateItem(userId, productId, quantity) {
 async function removeItem(userId, productId) {
   const cart = await Cart.findOne({ user: userId });
   if (!cart) {
-    throw ApiError.notFound('Cart not found');
+    return getCart(userId);
   }
 
   cart.items = cart.items.filter((i) => i.product.toString() !== productId);
@@ -159,12 +177,15 @@ async function mergeCart(userId, guestItems) {
       (i) => i.product.toString() === guestItem.productId
     );
 
-    const maxQty = Math.min(guestItem.quantity || 1, product.stock, 10);
+    const limit = Math.min(product.stock, MAX_PER_ITEM);
+    const maxQty = Math.min(guestItem.quantity || 1, limit);
 
     if (existingIndex >= 0) {
-      cart.items[existingIndex].quantity = Math.min(
-        cart.items[existingIndex].quantity + maxQty,
-        10
+      // Keep the larger of the two carts rather than adding them up, so
+      // signing in twice does not double the quantities.
+      cart.items[existingIndex].quantity = Math.max(
+        1,
+        Math.min(Math.max(cart.items[existingIndex].quantity, maxQty), limit || 1)
       );
     } else if (maxQty > 0) {
       cart.items.push({ product: guestItem.productId, quantity: maxQty });

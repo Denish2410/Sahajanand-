@@ -52,6 +52,17 @@ const couponSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // When set, the discount applies only to items of this category
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+    },
+    // Listed on the storefront offers section
+    showOnStorefront: {
+      type: Boolean,
+      default: false,
+    },
     usageLimit: {
       type: Number,
       default: 0, // 0 = unlimited

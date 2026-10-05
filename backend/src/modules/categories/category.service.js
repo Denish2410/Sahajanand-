@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { Category, Product } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const cloudinaryService = require('../../integrations/cloudinary/cloudinary.service');
@@ -46,7 +47,12 @@ async function getCategoryBySlug(slug) {
  * @returns {Promise<Array>}
  */
 async function getAllCategories() {
-  return Category.find().sort({ sortOrder: 1, name: 1 }).lean();
+  const [categories, counts] = await Promise.all([
+    Category.find().sort({ sortOrder: 1, name: 1 }).lean(),
+    Product.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }]),
+  ]);
+  const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+  return categories.map((cat) => ({ ...cat, productCount: countMap.get(String(cat._id)) || 0 }));
 }
 
 /**
@@ -55,6 +61,9 @@ async function getAllCategories() {
  * @returns {Promise<object>}
  */
 async function getCategoryById(id) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw ApiError.badRequest('Invalid category ID');
+  }
   const category = await Category.findById(id);
   if (!category) {
     throw ApiError.notFound('Category not found');
@@ -89,10 +98,7 @@ async function createCategory(data, file) {
  * @returns {Promise<object>}
  */
 async function updateCategory(id, data, file) {
-  const category = await Category.findById(id);
-  if (!category) {
-    throw ApiError.notFound('Category not found');
-  }
+  const category = await getCategoryById(id);
 
   if (file) {
     // Delete old image
@@ -117,10 +123,7 @@ async function updateCategory(id, data, file) {
  * @param {string} id
  */
 async function deleteCategory(id) {
-  const category = await Category.findById(id);
-  if (!category) {
-    throw ApiError.notFound('Category not found');
-  }
+  const category = await getCategoryById(id);
 
   const productCount = await Product.countDocuments({ category: id });
   if (productCount > 0) {

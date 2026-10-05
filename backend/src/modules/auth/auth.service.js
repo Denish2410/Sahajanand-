@@ -1,52 +1,90 @@
 const { User } = require('../../models');
 const config = require('../../config/env');
 const firebaseService = require('../../integrations/firebase/firebase.service');
+const ApiError = require('../../utils/ApiError');
 const logger = require('../../utils/logger');
+const { ROLES } = require('../../utils/roles');
+
+/**
+ * The role an email address is entitled to from the environment allow-lists.
+ * Only honoured for verified email addresses: otherwise anyone could register
+ * an unclaimed admin address and be handed the admin panel.
+ */
+function entitledRole(email, emailVerified) {
+  if (!emailVerified) return null;
+  if (config.superAdminEmails.includes(email)) return ROLES.SUPER_ADMIN;
+  if (config.adminEmails.includes(email)) return ROLES.ADMIN;
+  return null;
+}
 
 /**
  * Verify Firebase token and upsert the user in MongoDB.
- * Sets admin role if email is in ADMIN_EMAILS.
  *
  * @param {string} idToken - Firebase ID token
+ * @param {{name?: string, phone?: string}} [profile] - details from the sign-up form
  * @returns {Promise<object>} User document
  */
-async function loginWithFirebase(idToken) {
+async function loginWithFirebase(idToken, profile = {}) {
   const decodedToken = await firebaseService.verifyIdToken(idToken);
 
-  const { uid, name, email, picture, email_verified } = decodedToken;
+  const { uid, name, picture, email_verified } = decodedToken;
 
-  if (!email) {
-    throw new Error('Email not available from Firebase token');
+  if (!decodedToken.email) {
+    throw ApiError.badRequest('Your sign-in did not include an email address');
   }
 
-  const isAdmin = config.adminEmails.includes(email.toLowerCase());
+  const email = decodedToken.email.toLowerCase();
+  const emailVerified = email_verified || false;
+  const role = entitledRole(email, emailVerified);
 
-  const updateData = {
-    firebaseUid: uid,
-    name: name || email.split('@')[0],
-    email: email.toLowerCase(),
-    photoURL: picture || '',
-    emailVerified: email_verified || false,
-    lastLoginAt: new Date(),
-  };
-
-  // Only set role on first creation or if they're an admin email
   let user = await User.findOne({ firebaseUid: uid });
 
   if (!user) {
-    // New user
-    updateData.role = isAdmin ? 'admin' : 'user';
-    user = await User.create(updateData);
-    logger.info(`New user created: ${email} (role: ${updateData.role})`);
-  } else {
-    // Existing user — update fields, promote to admin if in ADMIN_EMAILS
-    if (isAdmin && user.role !== 'admin') {
-      updateData.role = 'admin';
+    // The same email may already exist under another sign-in (for example
+    // the Firebase account was deleted and created again).
+    const sameEmail = await User.findOne({ email });
+    if (sameEmail) {
+      if (!emailVerified) {
+        throw ApiError.conflict(
+          'An account with this email already exists. Verify your email address to sign in to it.'
+        );
+      }
+      sameEmail.firebaseUid = uid;
+      user = sameEmail;
     }
-    Object.assign(user, updateData);
-    await user.save();
-    logger.info(`User logged in: ${email}`);
   }
+
+  if (!user) {
+    user = await User.create({
+      firebaseUid: uid,
+      name: name || profile.name || email.split('@')[0],
+      email,
+      phone: profile.phone || '',
+      photoURL: picture || '',
+      emailVerified,
+      role: role || ROLES.USER,
+      lastLoginAt: new Date(),
+    });
+    logger.info(`New user created: ${email} (role: ${user.role})`);
+    return user;
+  }
+
+  // Existing user: keep the profile they edited, refresh what Firebase owns
+  user.emailVerified = emailVerified;
+  user.lastLoginAt = new Date();
+  if (picture) user.photoURL = picture;
+  if (!user.phone && profile.phone) user.phone = profile.phone;
+
+  // Promote from the allow-lists; never demote here (roles granted from the
+  // admin panel are kept).
+  if (role === ROLES.SUPER_ADMIN && user.role !== ROLES.SUPER_ADMIN) {
+    user.role = ROLES.SUPER_ADMIN;
+  } else if (role === ROLES.ADMIN && user.role === ROLES.USER) {
+    user.role = ROLES.ADMIN;
+  }
+
+  await user.save();
+  logger.info(`User logged in: ${email}`);
 
   return user;
 }
