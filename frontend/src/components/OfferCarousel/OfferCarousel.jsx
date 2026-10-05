@@ -10,14 +10,15 @@ const INTERVAL = 6000;
 
 export default function OfferCarousel() {
   const { openQuote, offers } = useApp();
-  const { getByModel } = useCatalogue();
-  const slides = offers.map((o) => ({ ...o, product: getByModel(o.productModel) })).filter((s) => s.product);
+  const { getProduct } = useCatalogue();
+  const slides = offers.map((o) => ({ ...o, product: getProduct(o.productSlug) })).filter((s) => s.product);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const touch = useRef(null);
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const go = useCallback((i) => setIndex((i + slides.length) % slides.length), [slides.length]);
+  useEffect(() => { if (index >= slides.length) setIndex(0); }, [index, slides.length]);
 
   useEffect(() => {
     if (paused || reduced || slides.length < 2) return;
@@ -48,7 +49,7 @@ export default function OfferCarousel() {
       <div className="offers__viewport">
         <div className="offers__track" style={{ transform: `translateX(-${index * 100}%)` }}>
           {slides.map((s, i) => (
-            <article key={s.id || s.productModel} className="offers__slide" data-tone={s.tone}
+            <article key={s.id} className="offers__slide" data-tone={s.tone}
               role="group" aria-roledescription="slide" aria-label={`${i + 1} of ${slides.length}`} aria-hidden={i !== index}>
               <div className="offers__copy">
                 <p className="offers__badge">{s.badge}</p>
@@ -73,7 +74,7 @@ export default function OfferCarousel() {
         <button className="offers__arrow" onClick={() => go(index - 1)} aria-label="Previous slide"><Icon name="left" /></button>
         <div className="offers__dots">
           {slides.map((s, i) => (
-            <button key={s.id || s.productModel} className="offers__dot" aria-label={`Go to slide ${i + 1}: ${s.title}`} aria-current={i === index} onClick={() => go(i)}>
+            <button key={s.id} className="offers__dot" aria-label={`Go to slide ${i + 1}: ${s.title}`} aria-current={i === index} onClick={() => go(i)}>
               <span key={i === index ? `on-${index}` : 'off'} className={i === index && !reduced ? 'is-running' : ''}
                 style={{ animationDuration: `${INTERVAL}ms`, animationPlayState: paused ? 'paused' : 'running' }} />
             </button>

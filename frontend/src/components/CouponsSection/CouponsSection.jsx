@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import Icon from '../Icon/Icon.jsx';
+import { fmtPrice } from '../../utils/format.js';
+
+const couponLabel = (c) => (c.discountType === 'percent' ? `${c.discountValue}% Off` : `${fmtPrice(c.discountValue)} Off`);
 import './CouponsSection.css';
 
 const COUPON_COLORS = [
@@ -26,8 +29,8 @@ export default function CouponsSection() {
     <section className="section wrap coupons-section" id="coupons">
       <div className="section-head">
         <div>
-          <h2>Exclusive Offers &amp; Coupons</h2>
-          <p className="lede">Copy a coupon code and apply it in your cart to save big.</p>
+          <h2>Current offers</h2>
+          <p className="lede">Copy a coupon code and apply it in your cart.</p>
         </div>
       </div>
       <div className="coupons-grid">
@@ -44,16 +47,19 @@ export default function CouponsSection() {
                 <div className="coupon-card__icon">
                   <Icon name="tag" size={28} />
                 </div>
-                <div className="coupon-card__label">{coupon.label}</div>
+                <div className="coupon-card__label">{couponLabel(coupon)}</div>
               </div>
               <div className="coupon-card__body">
-                <p className="coupon-card__desc">{coupon.description}</p>
-                {coupon.minOrder > 0 && (
-                  <p className="coupon-card__min">Min. order: ₹{coupon.minOrder.toLocaleString('en-IN')}</p>
+                <p className="coupon-card__desc">{coupon.description || couponLabel(coupon)}</p>
+                {coupon.minOrderValue > 0 && (
+                  <p className="coupon-card__min">Min. order: {fmtPrice(coupon.minOrderValue)}</p>
+                )}
+                {coupon.discountType === 'percent' && coupon.maxDiscount > 0 && (
+                  <p className="coupon-card__min">Up to {fmtPrice(coupon.maxDiscount)} off</p>
                 )}
                 {coupon.category && (
                   <p className="coupon-card__cat">
-                    Valid for: <strong>{coupon.category.replace(/-/g, ' ')}</strong>
+                    Valid for: <strong>{coupon.category.name}</strong>
                   </p>
                 )}
               </div>
@@ -79,7 +85,7 @@ export default function CouponsSection() {
         })}
       </div>
       <p className="coupons-section__note">
-        Apply coupon codes at checkout in your cart. Coupons cannot be combined.
+        Sign in and apply the code in your cart. One coupon per order.
       </p>
     </section>
   );

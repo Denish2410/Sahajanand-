@@ -1,11 +1,11 @@
-// Company facts exactly as printed in the catalogue (pages 4, 5, 57–60).
-export const company = {
+// Facts about the Elanpro brand, exactly as printed in the Elanpro catalogue
+// (pages 4, 5, 57–60). They describe the manufacturer, not this store: the
+// store's own name and contact details come from the API (store settings).
+export const brand = {
   name: 'Elanpro',
   legalName: 'Elan Professional Appliances Pvt. Ltd.',
   established: 2009,
   headquarters: 'Gurugram, Haryana',
-  phones: ['+91-88823 02532', '+91-96258 52532'],
-  email: 'enquiry@elanpro.net',
   website: 'www.elanpro.net',
   about: [
     'Established in 2009, Elanpro (Elan Professional Appliances Pvt. Ltd.) is a trusted name in India’s commercial refrigeration industry. Founded by industry veterans with over 70 years of combined experience, Elanpro has built a strong reputation for delivering innovative and high-quality refrigeration solutions across diverse sectors.',

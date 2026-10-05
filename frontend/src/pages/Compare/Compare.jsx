@@ -3,12 +3,14 @@ import { useApp, MAX_COMPARE } from '../../context/AppContext.jsx';
 import { useCatalogue } from '../../hooks/useCatalogue.js';
 import { productImage } from '../../utils/format.js';
 import Icon from '../../components/Icon/Icon.jsx';
+import { useSeo } from '../../hooks/useSeo.js';
 import './Compare.css';
 
 export default function Compare() {
   const { compare, toggleCompare, clearCompare, openQuote } = useApp();
   const { getProduct, getCategory } = useCatalogue();
   const items = compare.map(getProduct).filter(Boolean);
+  useSeo({ title: 'Compare products | Sahajanand Electronics', noindex: true });
 
   // Union of specification rows, in first-seen order.
   const labels = [];

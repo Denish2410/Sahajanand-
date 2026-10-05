@@ -39,7 +39,7 @@ export default function QuoteModal() {
         <header className="modal__head">
           <div>
             <h2 id="quote-title">Request a quote</h2>
-            <p className="muted">Share a few details and the Elanpro sales team will get back to you.</p>
+            <p className="muted">Share a few details and our sales team will get back to you.</p>
           </div>
           <button className="modal__close" onClick={closeQuote} aria-label="Close"><Icon name="close" /></button>
         </header>

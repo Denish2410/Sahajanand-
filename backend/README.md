@@ -1,6 +1,8 @@
 # Sahajanand Electronics & Refrigeration LLP — Backend API
 
-Production-grade REST API for the Sahajanand Electronics e-commerce platform. Built with **Node.js**, **Express**, **MongoDB**, **Firebase Auth**, **Razorpay**, and **Cloudinary**.
+REST API for the Sahajanand Electronics e-commerce platform. Built with **Node.js**, **Express**, **MongoDB**, **Firebase Auth**, **Razorpay** (optional), and **Cloudinary** (optional).
+
+To run it without any cloud accounts, use `npm run dev:local` (see the repository README).
 
 ---
 
@@ -28,7 +30,7 @@ npm install
 cp .env.example .env
 # Fill in all required values (see table below)
 
-# 3. Seed the database (categories, products, coupons)
+# 3. Load the Elanpro catalogue (zero stock, reference prices: set both in the admin panel)
 npm run seed
 
 # 4. Start the dev server
@@ -52,13 +54,16 @@ npm test
 | `FIREBASE_PROJECT_ID` | Yes | Firebase Console → Project Settings → General |
 | `FIREBASE_CLIENT_EMAIL` | Yes | Firebase Console → Project Settings → Service Accounts → Generate Key → `client_email` |
 | `FIREBASE_PRIVATE_KEY` | Yes | Same JSON file → `private_key` (escape `\n` as `\\n` in `.env`) |
-| `RAZORPAY_KEY_ID` | Yes | [Razorpay Dashboard](https://dashboard.razorpay.com) → Settings → API Keys |
-| `RAZORPAY_KEY_SECRET` | Yes | Same page |
-| `RAZORPAY_WEBHOOK_SECRET` | Yes | Razorpay Dashboard → Webhooks → Create → Secret |
-| `CLOUDINARY_CLOUD_NAME` | Yes | [Cloudinary Dashboard](https://cloudinary.com/console) |
-| `CLOUDINARY_API_KEY` | Yes | Same page |
-| `CLOUDINARY_API_SECRET` | Yes | Same page |
-| `ADMIN_EMAILS` | No | Comma-separated emails to auto-assign admin on login |
+| `RAZORPAY_KEY_ID` | No (all three or none) | [Razorpay Dashboard](https://dashboard.razorpay.com) → Settings → API Keys |
+| `RAZORPAY_KEY_SECRET` | No | Same page |
+| `RAZORPAY_WEBHOOK_SECRET` | No | Razorpay Dashboard → Webhooks → Create → Secret |
+| `CLOUDINARY_CLOUD_NAME` | No (all three or none) | [Cloudinary Dashboard](https://cloudinary.com/console) |
+| `CLOUDINARY_API_KEY` | No | Same page |
+| `CLOUDINARY_API_SECRET` | No | Same page |
+| `ADMIN_EMAILS` | No | Comma-separated emails that become admin on login (verified emails only) |
+| `SUPER_ADMIN_EMAILS` | No | Same, for super admins (settings, roles) |
+| `GST_PERCENT` | No | Default `18`; added at checkout only when `GST_INCLUSIVE=false` |
+| `PUBLIC_API_URL` | No | Public URL of this API, for links to locally stored uploads |
 | `ENABLE_COD` | No | `true` / `false` (default: `true`) |
 | `FREE_DELIVERY_ABOVE` | No | Amount in ₹ (default: `10000`) |
 | `DELIVERY_CHARGE` | No | Amount in ₹ (default: `500`) |
@@ -73,7 +78,9 @@ npm test
 |---|---|
 | `npm start` | Start production server |
 | `npm run dev` | Start with nodemon (hot reload) |
-| `npm run seed` | Seed categories, products, coupons |
+| `npm run seed` | Load the Elanpro catalogue (never overwrites edits) |
+| `npm run dev:local` | Run with a local database and the Firebase Auth emulator |
+| `npm run make-admin -- <email> [admin\|superadmin\|user]` | Change an account's role |
 | `npm run seed:destroy` | Delete all seeded data |
 | `npm test` | Run all tests |
 | `npm run test:coverage` | Run tests with coverage report |
@@ -175,7 +182,28 @@ All routes are prefixed with `/api`.
 | POST | `/payments/retry/:orderId` | User | Retry failed payment |
 | POST | `/payments/webhook` | — | Razorpay webhook (raw body) |
 
+### Added for the storefront
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/settings` | — | Store name, contact details, pricing rules, available payment methods |
+| GET | `/banners` | — | Homepage carousel slides |
+| GET | `/coupons` | — | Coupons the store chose to advertise |
+| POST | `/enquiries` | — (optional) | Request a quote; linked to the account when signed in |
+| GET | `/enquiries/my` | User | Enquiries sent from this account |
+| POST | `/orders/quote` | User | Server-side totals for the cart or given items (coupon, GST, delivery) |
+
+Responses are `{ success, message, data, meta? }`; errors are `{ success: false, message, errors? }`
+with `errors` as `[{ field, message }]`. List endpoints take `page` and `limit` and return
+`meta: { page, limit, total, totalPages }`.
+
 ### Admin (`/api/admin/*`)
+
+Every admin route requires an admin or super admin token. Additional routes:
+`GET /admin/enquiries`, `PATCH|DELETE /admin/enquiries/:id`, `GET|POST /admin/banners`,
+`PUT|DELETE /admin/banners/:id`, `GET /admin/settings`, `PUT /admin/settings` (super admin),
+`GET /admin/activity`, `PATCH /admin/orders/:id/resolve`, `PUT /admin/products/:id/images/order`.
+Order status moves only placed → confirmed → shipped → delivered (or cancelled before shipping);
+`PATCH /admin/users/:id/role` is super admin only.
 | Method | Path | Description |
 |---|---|---|
 | GET | `/admin/dashboard` | Dashboard stats |
@@ -184,7 +212,7 @@ All routes are prefixed with `/api`.
 | PATCH | `/admin/products/:id/stock` | Update stock |
 | PATCH | `/admin/products/:id/toggle` | Toggle active |
 | POST | `/admin/products/:id/images` | Upload images |
-| DELETE | `/admin/products/:id/images/:publicId` | Delete image |
+| DELETE | `/admin/products/:id/images/:imageId` | Delete image |
 | GET/POST | `/admin/categories` | List / Create categories |
 | GET/PUT/DELETE | `/admin/categories/:id` | Single category CRUD |
 | GET | `/admin/orders` | List orders (filters) |

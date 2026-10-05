@@ -1,11 +1,14 @@
-// Sign in / Create account, laid out like the big marketplaces: a brand panel
-// on the left that says what an account gets you, the form on the right,
-// and a single "email or mobile number" field.
-import { useState } from 'react';
+// Sign in / Create account: a brand panel on the left that says what an
+// account gets you, the form on the right.
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useQuery } from '../../router/index.jsx';
 import { useApp } from '../../context/AppContext.jsx';
-import { DEMO_USER, DEMO_ADMIN } from '../../services/store.js';
+import { useSeo } from '../../hooks/useSeo.js';
 import './Auth.css';
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Only allow redirects back into this site
+const safeNext = (value) => (value && value.startsWith('/') && !value.startsWith('//') ? value : '/account');
 
 function Shell({ title, blurb, points, children }) {
   return (
@@ -33,33 +36,61 @@ function Password({ id, value, onChange, invalid, describedBy, autoComplete }) {
   );
 }
 
+function Unavailable() {
+  return (
+    <p className="auth__info" role="status">
+      Customer accounts are not available right now. You can still browse the range and <Link to="/contact" className="auth__link">send us an enquiry</Link>.
+    </p>
+  );
+}
+
 export function Login() {
-  const { login, user } = useApp();
+  const { login, user, authReady, authConfigured, resetPassword, settings } = useApp();
   const navigate = useNavigate();
-  const next = useQuery().get('next') || '/account';
-  const [identifier, setIdentifier] = useState('');
+  const next = safeNext(useQuery().get('next'));
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
+  useSeo({ title: `Sign in | ${settings.storeName}`, noindex: true });
 
-  const submit = (e) => {
+  // Already signed in (or just signed in): continue to where they were going
+  useEffect(() => {
+    if (authReady && user && next !== '/account') navigate(next, { replace: true });
+  }, [authReady, user, next, navigate]);
+
+  const submit = async (e) => {
     e.preventDefault();
-    if (!identifier.trim()) return setError({ field: 'identifier', error: 'Enter your email or mobile number.' });
+    if (!EMAIL.test(email.trim())) return setError({ field: 'email', error: 'Enter your email address.' });
     if (!password) return setError({ field: 'password', error: 'Enter your password.' });
-    const res = login(identifier, password, { remember });
+    setBusy(true); setError(null);
+    const res = await login(email, password, { remember });
+    setBusy(false);
     if (!res.ok) return setError(res);
-    navigate(res.user.role === 'admin' && next === '/account' ? '/admin' : next);
+    const staff = res.user.role === 'admin' || res.user.role === 'superadmin';
+    navigate(staff && next === '/account' ? '/admin' : next, { replace: true });
   };
-  const fill = (c) => { setIdentifier(c.email); setPassword(c.password); setError(null); };
+
+  const sendReset = async () => {
+    if (!EMAIL.test(email.trim())) return setError({ field: 'email', error: 'Enter your email address above, then choose “Email me a reset link”.' });
+    setBusy(true); setError(null);
+    const res = await resetPassword(email);
+    setBusy(false);
+    if (!res.ok) return setError(res);
+    setResetMsg(`If an account exists for ${email.trim()}, a password reset link is on its way. Check your inbox and spam folder.`);
+  };
 
   if (user) {
+    const staff = user.role === 'admin' || user.role === 'superadmin';
     return (
       <Shell title="You are signed in" blurb={`Signed in as ${user.name}.`} points={[]}>
         <h2>Welcome back, {user.name.split(' ')[0]}</h2>
         <div className="auth__stack">
           <Link to="/account" className="btn btn-primary btn-block">Go to your account</Link>
-          {user.role === 'admin' && <Link to="/admin" className="btn btn-ghost btn-block">Open admin panel</Link>}
+          {staff && <Link to="/admin" className="btn btn-ghost btn-block">Open admin panel</Link>}
         </div>
       </Shell>
     );
@@ -69,61 +100,69 @@ export function Login() {
     <Shell title="Sign in" blurb="Get access to your orders, enquiries and saved addresses."
       points={['Track orders from dispatch to delivery', 'See every quote you have requested', 'Check out faster with saved addresses']}>
       <form onSubmit={submit} noValidate className="auth__form">
-        <h2>Sign in to Elanpro</h2>
+        <h2>Sign in to {settings.storeName}</h2>
+        {!authConfigured && <Unavailable />}
         <div className="field">
-          <label htmlFor="login-id">Email or mobile number</label>
-          <input id="login-id" className="input" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setError(null); }}
-            autoComplete="username" autoFocus aria-invalid={error?.field === 'identifier' ? 'true' : undefined} aria-describedby="login-err" />
+          <label htmlFor="login-id">Email</label>
+          <input id="login-id" className="input" type="email" inputMode="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }}
+            autoComplete="username" autoFocus aria-invalid={error?.field === 'email' ? 'true' : undefined} aria-describedby="login-err" />
         </div>
         <div className="field">
           <div className="auth__row">
             <label htmlFor="login-pw">Password</label>
-            <button type="button" className="auth__link" onClick={() => setForgot((f) => !f)}>Forgot password?</button>
+            <button type="button" className="auth__link" onClick={() => { setForgot((f) => !f); setResetMsg(''); }}>Forgot password?</button>
           </div>
           <Password id="login-pw" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }}
             invalid={error?.field === 'password'} describedBy="login-err" autoComplete="current-password" />
         </div>
-        {forgot && <p className="auth__info">Password reset by email is not connected in this prototype. An admin can set a new password for you from Admin, Customers.</p>}
+        {forgot && (
+          <div className="auth__info">
+            {resetMsg || (
+              <>
+                Enter your email above and we will send you a link to choose a new password.{' '}
+                <button type="button" className="auth__link" onClick={sendReset} disabled={busy}>Email me a reset link</button>
+              </>
+            )}
+          </div>
+        )}
         {error && <p className="field-error" id="login-err" role="alert">{error.error}</p>}
         <label className="auth__check"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Keep me signed in</label>
-        <button className="btn btn-primary btn-block">Sign in</button>
-        <p className="auth__legal">By continuing, you agree to Elanpro’s conditions of use and privacy notice.</p>
+        <button className="btn btn-primary btn-block" disabled={busy || !authConfigured}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
 
-      <div className="auth__demo">
-        <p><strong>Demo accounts</strong> (tap to fill)</p>
-        <button type="button" onClick={() => fill(DEMO_USER)}><span>Customer</span><code>{DEMO_USER.email}</code><code>{DEMO_USER.password}</code></button>
-        <button type="button" onClick={() => fill(DEMO_ADMIN)}><span>Admin</span><code>{DEMO_ADMIN.email}</code><code>{DEMO_ADMIN.password}</code></button>
-      </div>
-
-      <div className="auth__divider"><span>New to Elanpro?</span></div>
+      <div className="auth__divider"><span>New to {settings.storeName}?</span></div>
       <Link to={`/signup${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}`} className="btn btn-ghost btn-block">Create your account</Link>
-      <p className="auth__admin"><Link to="/admin/login">Admin sign in</Link></p>
     </Shell>
   );
 }
 
 export function Signup() {
-  const { signup } = useApp();
+  const { signup, user, authReady, authConfigured, settings } = useApp();
   const navigate = useNavigate();
-  const next = useQuery().get('next') || '/account';
+  const next = safeNext(useQuery().get('next'));
   const [v, setV] = useState({ name: '', phone: '', email: '', password: '', confirm: '' });
   const [errors, setErrors] = useState({});
-  const set = (k) => (e) => { setV((x) => ({ ...x, [k]: e.target.value })); setErrors((x) => ({ ...x, [k]: undefined })); };
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => { setV((x) => ({ ...x, [k]: e.target.value })); setErrors((x) => ({ ...x, [k]: undefined, form: undefined })); };
+  useSeo({ title: `Create account | ${settings.storeName}`, noindex: true });
 
-  const submit = (e) => {
+  useEffect(() => { if (authReady && user && !busy) navigate(next, { replace: true }); }, [authReady, user, busy, next, navigate]);
+
+  const submit = async (e) => {
     e.preventDefault();
     const er = {};
     if (!v.name.trim()) er.name = 'Enter your name.';
-    if (v.phone.replace(/\D/g, '').length < 10) er.phone = 'Enter a 10-digit mobile number.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) er.email = 'Enter an email address like name@company.com.';
-    if (v.password.length < 6) er.password = 'Use at least 6 characters.';
+    if (!/^[6-9]\d{9}$/.test(v.phone.replace(/\D/g, '').slice(-10)) || v.phone.replace(/\D/g, '').length < 10) er.phone = 'Enter a 10-digit Indian mobile number.';
+    if (!EMAIL.test(v.email.trim())) er.email = 'Enter an email address like name@company.com.';
+    if (v.password.length < 8) er.password = 'Use at least 8 characters.';
     if (v.confirm !== v.password) er.confirm = 'Passwords do not match.';
     setErrors(er);
     if (Object.keys(er).length) return;
-    const res = signup(v);
+    setBusy(true);
+    const res = await signup(v);
+    setBusy(false);
     if (!res.ok) return setErrors({ [res.field]: res.error });
-    navigate(next);
+    navigate(next, { replace: true });
   };
   const field = (k, label, props = {}) => (
     <div className="field">
@@ -139,17 +178,18 @@ export function Signup() {
     <Shell title="Create account" blurb="One account for orders, quotes and faster checkout."
       points={['Order equipment online', 'Request and track quotations', 'Save delivery addresses and GST details']}>
       <form onSubmit={submit} noValidate className="auth__form">
-        <h2>Create your Elanpro account</h2>
-        {field('name', 'Your name', { autoComplete: 'name', autoFocus: true })}
+        <h2>Create your {settings.storeName} account</h2>
+        {!authConfigured && <Unavailable />}
+        {field('name', 'Your name', { autoComplete: 'name', autoFocus: true, maxLength: 100 })}
         {field('phone', 'Mobile number', { type: 'tel', inputMode: 'tel', autoComplete: 'tel', placeholder: '10-digit mobile number' })}
         {field('email', 'Email', { type: 'email', autoComplete: 'email' })}
         {field('password', 'Password', { type: 'password' })}
         {field('confirm', 'Re-enter password', { type: 'password' })}
-        <button className="btn btn-primary btn-block">Create account</button>
-        <p className="auth__legal">By creating an account, you agree to Elanpro’s conditions of use and privacy notice.</p>
+        {errors.form && <p className="field-error" role="alert">{errors.form}</p>}
+        <button className="btn btn-primary btn-block" disabled={busy || !authConfigured}>{busy ? 'Creating account…' : 'Create account'}</button>
       </form>
       <div className="auth__divider"><span>Already have an account?</span></div>
-      <Link to="/login" className="btn btn-ghost btn-block">Sign in</Link>
+      <Link to={`/login${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}`} className="btn btn-ghost btn-block">Sign in</Link>
     </Shell>
   );
 }

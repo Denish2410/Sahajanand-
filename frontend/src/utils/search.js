@@ -1,5 +1,3 @@
-import { getCategory } from '../data/categories.js';
-
 const norm = (s) => String(s).toLowerCase();
 const compact = (s) => norm(s).replace(/[^a-z0-9]/g, '');
 
@@ -12,8 +10,7 @@ export function searchProducts(query, list) {
   const qCompact = compact(q);
   return list
     .map((p) => {
-      const cat = getCategory(p.category)?.name || '';
-      const hay = norm([p.model, p.name, p.familyName, cat, p.subcategory].join(' '));
+      const hay = norm([p.model, p.name, p.familyName, p.categoryName, p.subcategory, p.brand, p.sku].join(' '));
       const model = compact(p.model);
       let score = 0;
       if (model === qCompact) score = 100;

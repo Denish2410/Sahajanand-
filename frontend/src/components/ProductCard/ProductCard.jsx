@@ -11,13 +11,15 @@ export default function ProductCard({ product }) {
   const selected = compare.includes(product.id);
   const specs = keySpecs(product, 2);
   const href = `/product/${product.id}`;
+  const soldOut = product.stock === 0;
 
   return (
     <article className="pcard">
       <div className="pcard__media">
         <Link to={href} tabIndex={-1} aria-hidden="true">
-          <img src={productImage(product.image)} alt="" loading="lazy" />
+          <img src={productImage(product.image)} alt="" loading="lazy" decoding="async" />
         </Link>
+        {soldOut && <span className="pcard__flag">Out of stock</span>}
         <button
           className="pcard__compare"
           aria-pressed={selected}
@@ -46,8 +48,11 @@ export default function ProductCard({ product }) {
             {product.badges.slice(0, 3).map((b) => <li key={b} className="badge">{b}</li>)}
           </ul>
         )}
-        {product.price && (
-          <p className="pcard__price">{fmtPrice(product.price)}</p>
+        {product.price > 0 && (
+          <p className="pcard__price">
+            {fmtPrice(product.price)}
+            {product.mrp > product.price && <s className="pcard__mrp">{fmtPrice(product.mrp)}</s>}
+          </p>
         )}
       </div>
       <div className="pcard__actions">
@@ -56,10 +61,11 @@ export default function ProductCard({ product }) {
           className="btn btn-cart btn-sm"
           onClick={() => addToCart(product)}
           id={`add-to-cart-${product.id}`}
-          title="Add to cart"
+          title={soldOut ? 'Out of stock' : 'Add to cart'}
+          disabled={soldOut}
         >
           <Icon name="cart" size={15} />
-          Add to Cart
+          {soldOut ? 'Out of stock' : 'Add to Cart'}
         </button>
       </div>
       <button

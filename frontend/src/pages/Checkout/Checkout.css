@@ -32,3 +32,7 @@
   .co__items li { grid-template-columns: 56px 1fr auto; }
   .co__qty { grid-column: 2 / -1; }
 }
+
+.co__opt span strong { display: block; }
+.co__items .field-error { font-weight: 600; }
+.co__summary ul.field-error { display: grid; gap: 0.25rem; padding-left: 1rem; list-style: disc; }

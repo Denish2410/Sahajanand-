@@ -3,14 +3,20 @@ import { Link } from '../../router/index.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { useCatalogue } from '../../hooks/useCatalogue.js';
 import { sceneImage } from '../../utils/format.js';
+import { useSeo } from '../../hooks/useSeo.js';
 import ProductBrowser from '../../components/ProductBrowser/ProductBrowser.jsx';
 import NotFound from '../NotFound/NotFound.jsx';
 import './Category.css';
 
 export default function Category({ params }) {
   const { getCategory, byCategory } = useCatalogue();
-  const { openQuote } = useApp();
+  const { openQuote, settings } = useApp();
   const category = getCategory(params.slug);
+  useSeo(category ? {
+    title: `${category.name} | Elanpro at ${settings.storeName}`,
+    description: `${category.description} Available from ${settings.storeName}, authorised Elanpro reseller in ${settings.serviceAreas.join(' and ')}.`.trim(),
+    path: `/category/${category.slug}`,
+  } : { title: `Category not found | ${settings.storeName}`, noindex: true });
   const [sub, setSub] = useState('');
   useEffect(() => setSub(''), [params.slug]);
   if (!category) return <NotFound />;
@@ -21,16 +27,16 @@ export default function Category({ params }) {
   return (
     <>
       <header className="cat-hero">
-        <img className="cat-hero__bg" src={sceneImage(category.scene)} alt="" />
+        {category.scene && <img className="cat-hero__bg" src={sceneImage(category.scene)} alt="" />}
         <div className="wrap cat-hero__in">
           <nav className="breadcrumbs" aria-label="Breadcrumb">
             <Link to="/">Home</Link><span aria-hidden="true">/</span>
             <Link to="/products">Products</Link><span aria-hidden="true">/</span>
             <span>{category.name}</span>
           </nav>
-          <p className="cat-hero__tag">{category.tagline}</p>
+          {category.tagline && <p className="cat-hero__tag">{category.tagline}</p>}
           <h1>{category.name}</h1>
-          <p className="cat-hero__desc">{category.description}</p>
+          {category.description && <p className="cat-hero__desc">{category.description}</p>}
           <button className="btn btn-primary" onClick={() => openQuote()}>Request a quote</button>
         </div>
       </header>

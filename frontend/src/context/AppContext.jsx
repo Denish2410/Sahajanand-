@@ -1,75 +1,205 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { loadDb, saveDb, resetDb, readSession, writeSession } from '../services/store.js';
-import { slugify } from '../utils/format.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+  sendPasswordResetEmail, sendEmailVerification, updateProfile as fbUpdateProfile, updatePassword,
+  reauthenticateWithCredential, EmailAuthProvider, setPersistence, browserLocalPersistence, browserSessionPersistence,
+} from 'firebase/auth';
+import { auth, authConfigured } from '../services/firebase.js';
+import { api, ApiError } from '../services/api.js';
+import { toProduct, toCategory, toBanner, toCartLine } from '../services/mappers.js';
 
 const AppContext = createContext(null);
 export const MAX_COMPARE = 3;
-const uid = (p) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const sameLogin = (u, id) => {
-  const v = String(id).trim().toLowerCase();
-  const digits = v.replace(/\D/g, '');
-  return u.email.toLowerCase() === v || (digits.length >= 10 && u.phone.replace(/\D/g, '').endsWith(digits.slice(-10)));
+export const MAX_PER_ITEM = 10; // same limit the API enforces per product
+
+// Shown until the store settings arrive from the API
+const DEFAULT_SETTINGS = {
+  storeName: 'Sahajanand Electronics', legalName: '', announcement: '', supportPhone: '', supportPhoneAlt: '',
+  supportEmail: '', whatsapp: '', address: '', serviceAreas: ['Gandhinagar', 'Ahmedabad'], businessHours: '',
+  heroTitle: '', heroLede: '', gstInclusive: true, gstPercent: 18, deliveryCharge: 0, freeDeliveryAbove: 0,
+  maintenanceMode: false, paymentMethods: { cod: false, razorpay: false },
 };
 
+const GUEST_CART_KEY = 'sahajanand:cart';
+const loadGuestCart = () => {
+  try {
+    const items = JSON.parse(localStorage.getItem(GUEST_CART_KEY) || '[]');
+    return Array.isArray(items) ? items.filter((i) => i && i.productId && i.qty > 0) : [];
+  } catch {
+    return []; // storage unavailable or corrupted: start with an empty cart
+  }
+};
+
+// Firebase error codes → messages a customer can act on
+const AUTH_ERRORS = {
+  'auth/invalid-credential': { field: 'password', error: 'The email or password is incorrect.' },
+  'auth/wrong-password': { field: 'password', error: 'The email or password is incorrect.' },
+  'auth/user-not-found': { field: 'password', error: 'The email or password is incorrect.' },
+  'auth/invalid-email': { field: 'email', error: 'Enter a valid email address.' },
+  'auth/email-already-in-use': { field: 'email', error: 'An account with this email already exists. Sign in instead.' },
+  'auth/weak-password': { field: 'password', error: 'Choose a stronger password (at least 6 characters).' },
+  'auth/user-disabled': { field: 'email', error: 'This account has been disabled. Contact us for help.' },
+  'auth/too-many-requests': { field: 'password', error: 'Too many attempts. Please wait a few minutes and try again.' },
+  'auth/network-request-failed': { field: 'form', error: 'We could not reach the sign-in service. Check your connection and try again.' },
+  'auth/requires-recent-login': { field: 'form', error: 'Please sign out, sign in again, and retry.' },
+};
+const authFailure = (err) => {
+  if (err instanceof ApiError) return { ok: false, field: 'form', error: err.message };
+  return { ok: false, ...(AUTH_ERRORS[err?.code] || { field: 'form', error: 'Sign-in failed. Please try again.' }) };
+};
+const NO_AUTH = { ok: false, field: 'form', error: 'Customer accounts are not available right now. Please contact us to place an order.' };
+
 export function AppProvider({ children }) {
-  // ─── Database (localStorage-backed; see services/store.js) ─────────────────
-  const [db, setDb] = useState(loadDb);
-  useEffect(() => { saveDb(db); }, [db]);
+  // ─── Catalogue and store settings (from the API) ───────────────────────────
+  const [catalogue, setCatalogue] = useState({ status: 'loading', products: [], categories: [], offers: [], coupons: [] });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
-  // ─── Session ───────────────────────────────────────────────────────────────
-  const [sessionId, setSessionId] = useState(readSession);
-  const user = useMemo(() => db.users.find((u) => u.id === sessionId && u.status !== 'blocked') || null, [db.users, sessionId]);
-  const isAdmin = user?.role === 'admin';
+  const loadCatalogue = useCallback(async () => {
+    try {
+      const [settingsData, categories, products, banners, coupons] = await Promise.all([
+        api.settings(),
+        api.categories(),
+        api.products(),
+        api.banners().catch(() => []), // the page works without promotions
+        api.coupons().catch(() => []),
+      ]);
+      setSettings({ ...DEFAULT_SETTINGS, ...settingsData });
+      setCatalogue({
+        status: 'ready',
+        categories: categories.map(toCategory),
+        products: products.map(toProduct),
+        offers: banners.map(toBanner),
+        coupons,
+      });
+    } catch (err) {
+      console.error('Could not load the catalogue:', err);
+      setCatalogue((c) => (c.status === 'ready' ? c : { ...c, status: 'error' }));
+    }
+  }, []);
+  useEffect(() => { loadCatalogue(); }, [loadCatalogue]);
 
-  const log = useCallback((action, by) => {
-    setDb((d) => ({ ...d, activity: [{ id: uid('act'), at: new Date().toISOString(), by: by || 'Admin', action }, ...d.activity].slice(0, 200) }));
+  const { products, categories, offers } = catalogue;
+  const productsById = useMemo(() => new Map(products.map((p) => [p._id, p])), [products]);
+
+  // ─── Notices (toast) ───────────────────────────────────────────────────────
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(''), 4500);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  // ─── Session (Firebase Authentication + profile from the API) ──────────────
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(!authConfigured);
+  const pendingProfile = useRef(null); // name/phone typed on the sign-up form
+  const syncing = useRef(null);
+
+  // Exchange the Firebase sign-in for the store profile.
+  // A fresh sign-in or sign-up registers the session with the API (which
+  // creates the profile the first time). A page reload with a remembered
+  // session only reads the profile, so ordinary browsing never runs into the
+  // sign-in rate limit.
+  const freshSignIn = useRef(false);
+  const syncUser = useCallback((fbUser) => {
+    if (syncing.current?.uid === fbUser.uid) return syncing.current.promise;
+    const register = () => api.login(pendingProfile.current || {});
+    const restore = () => api.me().catch((err) => (err.status === 401 ? register() : Promise.reject(err)));
+    const promise = (freshSignIn.current ? register() : restore())
+      .then((profile) => { setUser(profile); return profile; })
+      .finally(() => { if (syncing.current?.promise === promise) syncing.current = null; pendingProfile.current = null; freshSignIn.current = false; });
+    syncing.current = { uid: fbUser.uid, promise };
+    return promise;
   }, []);
 
-  // Generic collection helpers used by the admin panel.
-  const upsert = useCallback((coll, item, key = 'id', originalKey) => {
-    setDb((d) => {
-      const match = originalKey ?? item[key];
-      const exists = d[coll].some((x) => x[key] === match);
-      return { ...d, [coll]: exists ? d[coll].map((x) => (x[key] === match ? { ...x, ...item } : x)) : [item, ...d[coll]] };
+  useEffect(() => {
+    if (!auth) return undefined;
+    return onAuthStateChanged(auth, async (fbUser) => {
+      if (!fbUser) { setUser(null); setAuthReady(true); return; }
+      try {
+        await syncUser(fbUser);
+      } catch (err) {
+        // The account was deactivated, or the API is down: do not stay half signed in
+        setUser(null);
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) await signOut(auth).catch(() => {});
+      } finally {
+        setAuthReady(true);
+      }
     });
+  }, [syncUser]);
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdmin = user?.role === 'superadmin';
+
+  const login = useCallback(async (email, password, { remember = true } = {}) => {
+    if (!auth) return NO_AUTH;
+    try {
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+      freshSignIn.current = true;
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const profile = await syncUser(cred.user);
+      return { ok: true, user: profile };
+    } catch (err) {
+      freshSignIn.current = false;
+      if (err instanceof ApiError) await signOut(auth).catch(() => {});
+      return authFailure(err);
+    }
+  }, [syncUser]);
+
+  const signup = useCallback(async ({ name, email, phone, password }) => {
+    if (!auth) return NO_AUTH;
+    try {
+      pendingProfile.current = { name: name.trim(), phone: phone.replace(/\D/g, '').slice(-10) };
+      await setPersistence(auth, browserLocalPersistence);
+      freshSignIn.current = true;
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      fbUpdateProfile(cred.user, { displayName: name.trim() }).catch(() => {});
+      // Best effort: the account works without it, but admin access needs a verified email
+      sendEmailVerification(cred.user).catch(() => {});
+      const profile = await syncUser(cred.user);
+      return { ok: true, user: profile };
+    } catch (err) {
+      pendingProfile.current = null; freshSignIn.current = false;
+      if (err instanceof ApiError) await signOut(auth).catch(() => {});
+      return authFailure(err);
+    }
+  }, [syncUser]);
+
+  const logout = useCallback(async () => {
+    if (!auth) return;
+    await signOut(auth).catch(() => {});
+    setUser(null);
   }, []);
-  const remove = useCallback((coll, ids, key = 'id') => {
-    const set = new Set([].concat(ids));
-    setDb((d) => ({ ...d, [coll]: d[coll].filter((x) => !set.has(x[key])) }));
+
+  const resetPassword = useCallback(async (email) => {
+    if (!auth) return NO_AUTH;
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      return { ok: true };
+    } catch (err) {
+      // Do not reveal whether an account exists for this address
+      if (err?.code === 'auth/user-not-found') return { ok: true };
+      return authFailure(err);
+    }
   }, []);
-  const setColl = useCallback((coll, value) => setDb((d) => ({ ...d, [coll]: typeof value === 'function' ? value(d[coll]) : value })), []);
-  const resetDemo = useCallback(() => { setDb(resetDb()); }, []);
-  const importDb = useCallback((data) => { setDb((d) => ({ ...d, ...data, version: d.version })); }, []);
 
-  // ─── Auth ──────────────────────────────────────────────────────────────────
-  const login = useCallback((identifier, password, { remember = true, adminOnly = false } = {}) => {
-    const u = db.users.find((x) => sameLogin(x, identifier));
-    if (!u) return { ok: false, field: 'identifier', error: 'We cannot find an account with that email or mobile number.' };
-    if (u.password !== password) return { ok: false, field: 'password', error: 'Your password is incorrect.' };
-    if (u.status === 'blocked') return { ok: false, field: 'identifier', error: 'This account has been blocked. Contact customer care.' };
-    if (adminOnly && u.role !== 'admin') return { ok: false, field: 'identifier', error: 'This account does not have admin access.' };
-    writeSession(u.id, remember); setSessionId(u.id);
-    return { ok: true, user: u };
-  }, [db.users]);
+  const changePassword = useCallback(async (current, next) => {
+    if (!auth?.currentUser) return NO_AUTH;
+    try {
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, current));
+      await updatePassword(auth.currentUser, next);
+      return { ok: true };
+    } catch (err) {
+      if (['auth/invalid-credential', 'auth/wrong-password'].includes(err?.code)) return { ok: false, error: 'Your current password is incorrect.' };
+      return authFailure(err);
+    }
+  }, []);
 
-  const signup = useCallback(({ name, email, phone, password }) => {
-    if (db.users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) return { ok: false, field: 'email', error: 'An account with this email already exists. Sign in instead.' };
-    if (db.users.some((u) => u.phone.replace(/\D/g, '').slice(-10) === phone.replace(/\D/g, '').slice(-10))) return { ok: false, field: 'phone', error: 'An account with this mobile number already exists.' };
-    const u = { id: uid('u'), role: 'customer', name: name.trim(), email: email.trim(), phone: phone.trim(), password, company: '', gstin: '', status: 'active', addresses: [], createdAt: new Date().toISOString() };
-    setDb((d) => ({ ...d, users: [...d.users, u] }));
-    writeSession(u.id, true); setSessionId(u.id);
-    return { ok: true, user: u };
-  }, [db.users]);
-
-  const logout = useCallback(() => { writeSession(null); setSessionId(null); }, []);
-  const updateProfile = useCallback((patch) => { if (user) upsert('users', { id: user.id, ...patch }); }, [user, upsert]);
-
-  // ─── Storefront catalogue (drafts hidden) ──────────────────────────────────
-  const products = useMemo(() => db.products.filter((p) => p.status !== 'draft'), [db.products]);
-  const categories = db.categories;
-  const offers = useMemo(() => db.offers.filter((o) => o.active !== false), [db.offers]);
-  const today = new Date().toISOString().slice(0, 10);
-  const COUPONS = useMemo(() => db.coupons.filter((c) => c.active && (!c.expires || c.expires >= today)), [db.coupons, today]);
+  const updateProfile = useCallback(async (values) => {
+    const profile = await api.updateProfile(values);
+    setUser(profile);
+    return profile;
+  }, []);
 
   // ─── Quote modal, compare ──────────────────────────────────────────────────
   const [quote, setQuote] = useState({ open: false, model: '' });
@@ -77,7 +207,6 @@ export function AppProvider({ children }) {
   const closeQuote = useCallback(() => setQuote((q) => ({ ...q, open: false })), []);
 
   const [compare, setCompare] = useState([]);
-  const [notice, setNotice] = useState('');
   const toggleCompare = useCallback((id) => {
     setCompare((list) => {
       if (list.includes(id)) return list.filter((x) => x !== id);
@@ -86,128 +215,167 @@ export function AppProvider({ children }) {
     });
   }, []);
   const clearCompare = useCallback(() => setCompare([]), []);
-  useEffect(() => {
-    if (!notice) return;
-    const t = setTimeout(() => setNotice(''), 4000);
-    return () => clearTimeout(t);
-  }, [notice]);
-
-  // ─── Enquiries ─────────────────────────────────────────────────────────────
-  const addEnquiry = useCallback((values) => {
-    let reference = '';
-    setDb((d) => {
-      reference = `ENQ-${d.seq.enquiry}`;
-      const e = { id: reference, reference, ...values, status: 'New', notes: '', userId: user?.id || '', createdAt: new Date().toISOString() };
-      return { ...d, enquiries: [e, ...d.enquiries], seq: { ...d.seq, enquiry: d.seq.enquiry + 1 } };
-    });
-    return reference || `ENQ-${db.seq.enquiry}`;
-  }, [user, db.seq.enquiry]);
 
   // ─── Cart ──────────────────────────────────────────────────────────────────
-  const [cart, setCart] = useState([]);
+  // Signed in: the cart lives on the server. Guest: in this browser, and it is
+  // merged into the account's cart on sign-in.
+  const [guestCart, setGuestCart] = useState(loadGuestCart);
+  const [serverCart, setServerCart] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [couponError, setCouponError] = useState('');
+  const [cartBusy, setCartBusy] = useState(false);
+  const guestRef = useRef(guestCart);
+  guestRef.current = guestCart;
 
-  const addToCart = useCallback((product, qty = 1) => {
-    if (product.stock === 0) { setNotice(`${product.model} is out of stock. Request a quote for lead time.`); return; }
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
-      if (existing) return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + qty } : i));
-      return [...prev, { ...product, qty }];
-    });
+  useEffect(() => {
+    try { localStorage.setItem(GUEST_CART_KEY, JSON.stringify(guestCart)); } catch { /* private mode: cart lasts for this visit only */ }
+  }, [guestCart]);
+
+  const userId = user?._id || null;
+  useEffect(() => {
+    if (!userId) { setServerCart(null); return undefined; }
+    let cancelled = false;
+    const guest = guestRef.current;
+    const load = guest.length
+      ? api.cartMerge(guest.map((i) => ({ productId: i.productId, quantity: Math.min(i.qty, MAX_PER_ITEM) })))
+      : api.cart();
+    load
+      .then((cart) => { if (!cancelled) { setServerCart(cart); if (guest.length) setGuestCart([]); } })
+      .catch((err) => { if (!cancelled) { setServerCart({ items: [], cartTotal: 0 }); setNotice(err.message); } });
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const cart = useMemo(() => {
+    if (userId) return (serverCart?.items || []).map(toCartLine);
+    return guestCart
+      .map((i) => {
+        const p = productsById.get(i.productId);
+        return p && { productId: p._id, id: p.id, model: p.model, name: p.name, image: p.image, price: p.price, qty: i.qty, stock: p.stock, unavailable: p.stock === 0, exceedsStock: p.stock > 0 && i.qty > p.stock };
+      })
+      .filter(Boolean);
+  }, [userId, serverCart, guestCart, productsById]);
+
+  const withCart = useCallback(async (call) => {
+    setCartBusy(true);
+    try {
+      setServerCart(await call());
+      return true;
+    } catch (err) {
+      setNotice(err.message);
+      return false;
+    } finally {
+      setCartBusy(false);
+    }
+  }, []);
+
+  const addToCart = useCallback(async (product, qty = 1) => {
+    if (product.stock === 0) { setNotice(`${product.model} is out of stock. Request a quote and we will confirm the lead time.`); return; }
+    if (userId) {
+      if (await withCart(() => api.cartAdd(product._id, qty))) setCartOpen(true);
+      return;
+    }
+    const limit = Math.min(product.stock, MAX_PER_ITEM);
+    const current = guestRef.current.find((i) => i.productId === product._id)?.qty || 0;
+    if (current >= limit) {
+      setNotice(product.stock < MAX_PER_ITEM
+        ? `Only ${product.stock} of ${product.model} in stock.`
+        : `You can order up to ${MAX_PER_ITEM} of one product online. Request a quote for larger quantities.`);
+      return;
+    }
+    const next = Math.min(current + qty, limit);
+    setGuestCart((prev) => (current
+      ? prev.map((i) => (i.productId === product._id ? { ...i, qty: next } : i))
+      : [...prev, { productId: product._id, qty: next }]));
     setCartOpen(true);
-  }, []);
-  const removeFromCart = useCallback((id) => setCart((prev) => prev.filter((i) => i.id !== id)), []);
-  const updateQty = useCallback((id, qty) => { if (qty >= 1) setCart((prev) => prev.map((i) => (i.id === id ? { ...i, qty } : i))); }, []);
-  const clearCart = useCallback(() => { setCart([]); setAppliedCoupon(null); setCouponError(''); }, []);
-  const cartSubtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.qty, 0), [cart]);
+  }, [userId, withCart]);
 
-  const applyCoupon = useCallback((code) => {
-    const coupon = COUPONS.find((c) => c.code === code.toUpperCase().trim());
-    if (!coupon) { setCouponError('Invalid or expired coupon code.'); setAppliedCoupon(null); return; }
-    if (coupon.minOrder && cartSubtotal < coupon.minOrder) {
-      setCouponError(`Minimum order ₹${coupon.minOrder.toLocaleString('en-IN')} required for this coupon.`); setAppliedCoupon(null); return;
+  // Cart lines are addressed by their product slug (`id`)
+  const lineBySlug = useCallback((slug) => cart.find((i) => i.id === slug), [cart]);
+
+  const updateQty = useCallback(async (slug, qty) => {
+    const line = lineBySlug(slug);
+    if (!line || qty < 1) return;
+    if (qty > MAX_PER_ITEM) { setNotice(`You can order up to ${MAX_PER_ITEM} of one product online. Request a quote for larger quantities.`); return; }
+    if (qty > line.qty && qty > line.stock) { setNotice(`Only ${line.stock} of ${line.model} in stock.`); return; }
+    if (userId) await withCart(() => api.cartUpdate(line.productId, qty));
+    else setGuestCart((prev) => prev.map((i) => (i.productId === line.productId ? { ...i, qty } : i)));
+  }, [userId, lineBySlug, withCart]);
+
+  const removeFromCart = useCallback(async (slug) => {
+    const line = lineBySlug(slug);
+    if (!line) return;
+    if (userId) await withCart(() => api.cartRemove(line.productId));
+    else setGuestCart((prev) => prev.filter((i) => i.productId !== line.productId));
+  }, [userId, lineBySlug, withCart]);
+
+  const [couponCode, setCouponCode] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [totals, setTotals] = useState(null); // server-priced order quote (signed in)
+
+  const clearCart = useCallback(async () => {
+    setCouponCode(''); setCouponError('');
+    if (userId) {
+      try { await api.cartClear(); setServerCart({ items: [], cartTotal: 0 }); } catch (err) { setNotice(err.message); }
+    } else {
+      setGuestCart([]);
     }
-    if (coupon.category && !cart.some((i) => i.category === coupon.category)) {
-      setCouponError(`This coupon is only valid for ${coupon.category.replace(/-/g, ' ')} products.`); setAppliedCoupon(null); return;
+  }, [userId]);
+
+  const refreshCart = useCallback(async () => {
+    if (!userId) return;
+    try { setServerCart(await api.cart()); } catch (err) { setNotice(err.message); }
+  }, [userId]);
+
+  // Totals always come from the server, so the cart shows what checkout charges
+  const purchasable = cart.filter((i) => !i.unavailable);
+  const cartKey = purchasable.map((i) => `${i.productId}:${i.qty}`).join(',');
+  useEffect(() => {
+    if (!userId || !cartKey) { setTotals(null); return undefined; }
+    const controller = new AbortController();
+    const t = setTimeout(() => {
+      api.quote({ couponCode: couponCode || undefined }, { signal: controller.signal })
+        .then((q) => {
+          setTotals(q);
+          if (couponCode && q.couponError) { setCouponError(q.couponError); setCouponCode(''); }
+        })
+        .catch((err) => { if (err.name !== 'AbortError') setTotals(null); });
+    }, 200);
+    return () => { clearTimeout(t); controller.abort(); };
+  }, [userId, cartKey, couponCode]);
+
+  const applyCoupon = useCallback(async (code) => {
+    const value = code.trim().toUpperCase();
+    if (!value) { setCouponError('Enter a coupon code.'); return; }
+    if (!userId) { setCouponError('Sign in to use a coupon code.'); return; }
+    try {
+      const q = await api.quote({ couponCode: value });
+      if (q.couponError) { setCouponError(q.couponError); setCouponCode(''); return; }
+      setTotals(q); setCouponCode(value); setCouponError('');
+    } catch (err) {
+      setCouponError(err.message);
     }
-    setAppliedCoupon(coupon); setCouponError('');
-  }, [COUPONS, cart, cartSubtotal]);
-  const removeCoupon = useCallback(() => { setAppliedCoupon(null); setCouponError(''); }, []);
+  }, [userId]);
+  const removeCoupon = useCallback(() => { setCouponCode(''); setCouponError(''); }, []);
 
-  const cartDiscount = useMemo(() => {
-    if (!appliedCoupon) return 0;
-    return appliedCoupon.type === 'percent' ? Math.round(cartSubtotal * appliedCoupon.discount) : Math.min(appliedCoupon.discount, cartSubtotal);
-  }, [appliedCoupon, cartSubtotal]);
-  const cartTotal = useMemo(() => Math.max(0, cartSubtotal - cartDiscount), [cartSubtotal, cartDiscount]);
-  const cartCount = useMemo(() => cart.reduce((sum, i) => sum + i.qty, 0), [cart]);
-  const cartTax = Math.round((cartTotal * db.settings.gstPercent) / 100);
-  const cartShipping = cart.length === 0 || cartSubtotal >= db.settings.freeShippingAbove ? 0 : db.settings.shippingFlat;
-  const cartGrandTotal = cartTotal + cartTax + cartShipping;
-
-  // ─── Orders ────────────────────────────────────────────────────────────────
-  const placeOrder = useCallback(({ address, paymentMethod, note }) => {
-    if (!user || cart.length === 0) return null;
-    const id = `EP-${db.seq.order}`;
-    const now = new Date().toISOString();
-    const order = {
-      id, userId: user.id,
-      customer: { name: user.name, email: user.email, phone: user.phone, company: user.company, gstin: user.gstin },
-      items: cart.map(({ id: pid, model, name, image, price, qty, category }) => ({ id: pid, model, name, image, price, qty, category })),
-      address, paymentMethod, paymentStatus: 'Pending', couponCode: appliedCoupon?.code || '',
-      subtotal: cartSubtotal, discount: cartDiscount, tax: cartTax, shipping: cartShipping, total: cartGrandTotal,
-      status: 'Placed', history: [{ status: 'Placed', at: now, by: user.name }], note: note || '', createdAt: now,
-    };
-    setDb((d) => ({
-      ...d,
-      orders: [order, ...d.orders],
-      seq: { ...d.seq, order: d.seq.order + 1 },
-      products: d.products.map((p) => {
-        const l = cart.find((i) => i.id === p.id);
-        return l ? { ...p, stock: Math.max(0, (p.stock ?? 0) - l.qty) } : p;
-      }),
-      coupons: d.coupons.map((c) => (c.code === appliedCoupon?.code ? { ...c, used: (c.used || 0) + 1 } : c)),
-    }));
-    clearCart();
-    return id;
-  }, [user, cart, db.seq.order, appliedCoupon, cartSubtotal, cartDiscount, cartTax, cartShipping, cartGrandTotal, clearCart]);
-
-  const updateOrder = useCallback((id, patch, by) => {
-    setDb((d) => ({
-      ...d,
-      orders: d.orders.map((o) => {
-        if (o.id !== id) return o;
-        const history = patch.status && patch.status !== o.status ? [...o.history, { status: patch.status, at: new Date().toISOString(), by: by || 'Admin' }] : o.history;
-        return { ...o, ...patch, history };
-      }),
-      // Cancelling returns the stock.
-      products: patch.status === 'Cancelled'
-        ? d.products.map((p) => {
-            const o = d.orders.find((x) => x.id === id);
-            const l = o && o.status !== 'Cancelled' ? o.items.find((i) => i.id === p.id) : null;
-            return l ? { ...p, stock: (p.stock ?? 0) + l.qty } : p;
-          })
-        : d.products,
-    }));
-  }, []);
-
-  const uniqueProductId = useCallback((model, currentId) => {
-    let base = slugify(model) || 'product'; let id = base; let n = 2;
-    while (db.products.some((p) => p.id === id && p.id !== currentId)) id = `${base}-${n++}`;
-    return id;
-  }, [db.products]);
+  const localSubtotal = purchasable.reduce((sum, i) => sum + i.price * Math.min(i.qty, i.stock || i.qty), 0);
+  const cartSubtotal = totals?.itemsTotal ?? localSubtotal;
+  const cartDiscount = totals?.discount ?? 0;
+  const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+  const appliedCoupon = couponCode && cartDiscount > 0 ? { code: couponCode } : null;
 
   const value = {
-    db, upsert, remove, setColl, log, resetDemo, importDb, uniqueProductId,
-    user, isAdmin, login, signup, logout, updateProfile,
-    products, categories, offers, settings: db.settings,
-    quote, openQuote, closeQuote, addEnquiry,
+    // catalogue
+    catalogueStatus: catalogue.status, reloadCatalogue: loadCatalogue,
+    products, categories, offers, COUPONS: catalogue.coupons, settings, setSettings,
+    // session
+    user, isAdmin, isSuperAdmin, authReady, authConfigured,
+    login, signup, logout, resetPassword, changePassword, updateProfile,
+    // quote modal, compare, toast
+    quote, openQuote, closeQuote,
     compare, toggleCompare, clearCompare, notice, setNotice,
-    cart, cartOpen, setCartOpen, addToCart, removeFromCart, updateQty, clearCart,
-    cartSubtotal, cartDiscount, cartTotal, cartCount, cartTax, cartShipping, cartGrandTotal,
-    appliedCoupon, applyCoupon, removeCoupon, couponError, COUPONS,
-    placeOrder, updateOrder,
+    // cart
+    cart, cartOpen, setCartOpen, cartBusy, addToCart, removeFromCart, updateQty, clearCart, refreshCart,
+    cartSubtotal, cartDiscount, cartTotal: Math.max(0, cartSubtotal - cartDiscount), cartCount, totals,
+    appliedCoupon, applyCoupon, removeCoupon, couponError, couponCode,
   };
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

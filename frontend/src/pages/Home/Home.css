@@ -60,3 +60,8 @@
 .home-cta__in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.5rem 3rem; padding-block: clamp(2.5rem, 6vw, 4.5rem); }
 .home-cta p { margin-top: 0.75rem; color: rgba(255, 255, 255, 0.8); font-size: var(--fs-2); }
 .home-cta__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+.home-trust { background: var(--surface); border-bottom: 1px solid var(--line); }
+.home-trust__in { display: flex; flex-wrap: wrap; gap: 0.5rem 2.5rem; padding-block: 0.9rem; font-weight: 600; font-size: var(--fs-0); color: var(--ink-2); }
+.home-trust__in li { display: inline-flex; align-items: center; gap: 0.45rem; }
+.home-trust__in svg { color: var(--ok); flex: none; }

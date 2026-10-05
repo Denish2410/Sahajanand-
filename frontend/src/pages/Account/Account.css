@@ -73,3 +73,8 @@
   .order__id { margin-left: 0; text-align: left; }
   .tracker small { display: none; }
 }
+
+.acct__warn { padding: 0.7rem 0.9rem; background: #fdf3e3; border: 1px solid #f0d3a2; border-radius: var(--r-1); font-size: var(--fs-0); }
+.acct__actions .auth__link { background: none; }
+.pill--shipped { background: #e6e1f7; color: #44359a; }
+.pill--failed, .pill--refund_pending { background: #fbe1df; color: #9a1f17; }

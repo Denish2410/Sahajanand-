@@ -16,7 +16,7 @@
 .hero__tag span { color: rgba(255, 255, 255, 0.85); font-size: var(--fs-0); }
 .hero__tag small { color: rgba(255, 255, 255, 0.6); font-size: var(--fs-0); }
 
-.hero__axis { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid rgba(255, 255, 255, 0.28); }
+.hero__axis { display: grid; grid-template-columns: repeat(var(--stops, 6), 1fr); border-top: 1px solid rgba(255, 255, 255, 0.28); }
 .hero__stop { position: relative; text-align: left; padding: 1.1rem 0.75rem 1.4rem 0; color: rgba(255, 255, 255, 0.62); display: grid; gap: 0.15rem; transition: color 0.2s; }
 .hero__stop::before { content: ''; position: absolute; top: -1px; left: 0; width: 1px; height: 12px; background: rgba(255, 255, 255, 0.5); }
 .hero__stop::after { content: ''; position: absolute; top: -2px; left: 0; right: 0.75rem; height: 3px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.4s var(--ease); }

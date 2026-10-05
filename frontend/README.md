@@ -1,142 +1,41 @@
-# Elanpro website concept (Vite + React)
+# Sahajanand Electronics: storefront and admin panel
 
-A B2B product catalogue and enquiry site for Elanpro commercial refrigeration.
-All products, specifications and images come from the Elanpro catalogue PDF.
+Vite + React 18 single-page app. Plain CSS with design tokens in
+`src/styles/tokens.css`; no UI framework and a small built-in router.
 
-## Demo logins
-
-| Role | Email | Mobile | Password | Where |
-|---|---|---|---|---|
-| Customer | user@elanpro-demo.com | 9876543210 | Demo@123 | `/login` |
-| Admin | admin@elanpro-demo.com | 9000000001 | Admin@123 | `/admin` (or `/login`) |
-
-Both sign-in screens have a "tap to fill" box with these details.
-
-**This is a frontend-only prototype.** Accounts, orders, enquiries and every
-admin edit are stored in the browser's localStorage (`src/services/store.js`),
-with passwords in plain text. It is for demonstration, not production: a real
-launch needs a backend with proper authentication. Data is per browser; use
-Admin, Settings, Data tools to back up, import or reset it.
-
-## Customer features
-
-- `/login`, `/signup`: sign in with email or mobile number, show/hide password,
-  keep me signed in, account menu in the header ("Hello, sign in").
-- `/account`: overview, orders with tracking and cancel, enquiries, saved
-  addresses, profile and password.
-- `/checkout`: address, payment method, review, GST and shipping, order placed.
-  No payment is taken.
-
-## Admin panel (`/admin`)
-
-- **Dashboard:** revenue, orders, enquiries, customers, stock value, 7-day
-  revenue, orders by status, sales by category, low stock, best sellers, activity.
-- **Orders:** search and filter, change order and payment status, order detail
-  with timeline and notes, print, delete, CSV export. Cancelling restocks items.
-- **Enquiries:** every quote request, status pipeline, internal notes, CSV export.
-- **Customers:** add, edit, block, reset password, make admin, delete, CSV export.
-- **Products:** add, edit, duplicate, delete, bulk actions, stock, draft/active,
-  featured, images, specifications, filters data, CSV export.
-- **Categories:** add, edit, reorder, delete (when empty), homepage tile size.
-- **Coupons:** create, edit, expiry, minimum order, category limit, on/off.
-- **Homepage banners:** carousel slides: add, edit, reorder, hide.
-- **Settings:** announcement bar, support contacts, homepage headline, GST,
-  shipping, low-stock threshold, maintenance notice, admin password, backup,
-  import, reset demo data.
-- **Activity log:** who changed what, searchable, CSV export.
-
-## Demo product set
-
-The site currently shows 25 Elanpro products: 5 in each of Professional Kitchen,
-Bar Refrigeration, Retail Solution, Ice Machine and Vending Machine. The list and
-prices live in `PICKS` in `src/data/products.js`; specifications are pulled from
-`src/data/families.js` (the catalogue). Prices marked `listed` were found on an
-Indian marketplace listing; all others are indicative placeholders for the demo.
-Photos load from elanpro.net where available and fall back to the local catalogue
-image automatically.
-
-## Run it
-
-Requires Node 18 or newer.
+All data comes from the backend API (`VITE_API_URL`). Nothing is stored in the
+browser except the guest cart, which is merged into the account's cart on sign-in.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # production build in dist/
-npm run preview    # serve the production build
+cp .env.example .env     # see the comments in the file
+npm run dev              # http://localhost:5173
+npm run build            # production build in dist/
 ```
 
-The site runs on local data out of the box. To run it against an API instead:
-
-```bash
-npm run api                      # optional mock backend on http://localhost:4000/api
-cp .env.example .env             # then set VITE_API_URL=http://localhost:4000/api
-npm run dev
-```
-
-The mock backend (`server/index.js`, no dependencies) serves `GET /api/products`,
-`GET /api/products/:id`, `GET /api/categories` and `POST /api/quotes`
-(saved to `server/quotes.json`). Point `VITE_API_URL` at the real backend later;
-only `src/services/api.js` talks to it.
-
-Deploying: this is a single-page app, so the host must serve `index.html` for
-unknown paths (Netlify, Vercel and `vite preview` do this by default).
+See the repository README for running the whole stack locally.
 
 ## Where things live
 
 ```
-public/images/products/   product cut-outs extracted from the catalogue (.webp)
-public/images/scenes/     lifestyle photos from the catalogue section pages
-server/index.js           optional mock API
+public/images/        catalogue product photos and scene photos
 src/
-  data/
-    families.js           the catalogue, one entry per specification table
-    products.js           flattens families into the product list the UI uses
-    categories.js         14 categories, taglines, subcategories
-    offers.js             homepage carousel slides (edit to change promotions)
-    industries.js         sectors and the categories that serve them
-    company.js            about text, contact details, footprint, customers
-  services/api.js         API layer (local data or VITE_API_URL)
-  context/AppContext.jsx  catalogue, quote modal and compare state
-  router/                 small history router (no dependency)
-  components/             Navbar, Hero, OfferCarousel, ProductCard, FilterPanel,
-                          ProductBrowser, QuoteModal, CompareTray, TempScale ...
-  pages/                  Home, Products, Category, ProductDetails, Compare,
-                          Solutions, About, Contact, NotFound
-  styles/tokens.css       design system variables (colours, type, spacing)
+  services/api.js     the only file that talks to the API
+  services/mappers.js API records → the shapes the components use
+  services/firebase.js, razorpay.js   sign-in and online payment
+  context/AppContext.jsx   catalogue, session, cart, compare, quote modal
+  hooks/              useCatalogue, useAsync, useSeo
+  components/         Navbar, Hero, ProductCard, CartDrawer, QuoteModal ...
+  pages/              Home, Products, Category, ProductDetails, Compare, Solutions,
+                      About, Contact, Auth, Account, Checkout, OrderPlaced, NotFound
+  admin/              admin panel (dashboard, orders, enquiries, customers,
+                      products & stock, categories, coupons, banners, settings, activity)
+  data/brand.js       facts about the Elanpro brand, as printed in its catalogue
+  data/industries.js  sectors and the categories that serve them
 ```
 
-Routes: `/`, `/products` (`?q=` for search), `/category/:slug`, `/product/:id`,
-`/compare`, `/solutions`, `/about`, `/contact`.
+Routes: `/`, `/products` (`?q=` for search), `/category/:slug`, `/product/:slug`,
+`/compare`, `/solutions`, `/about`, `/contact`, `/login`, `/signup`,
+`/account/:tab`, `/checkout`, `/order/:id`, `/admin/...`.
 
-## Common edits
-
-- **Add or change a product:** edit its table in `src/data/families.js`.
-  `labels` are the spec rows; each model's `values` line up with them.
-  `t: [min, max]` (°C) drives the temperature scale and filter, `cap` (litres)
-  drives the capacity filter and sort.
-- **Replace an image:** drop a file into `public/images/products/` and reference
-  its name (without extension) as `image` / `img`.
-- **Change the carousel:** edit `src/data/offers.js`. The badge labels
-  ("Featured solution" and so on) are demo labels, not real offers.
-- **Rebrand:** edit `src/styles/tokens.css`.
-- **Hero stops and featured tabs:** `STOPS` in `components/Hero/Hero.jsx` and
-  `FEATURED` in `pages/Home/Home.jsx`.
-
-## To confirm with Elanpro before launch
-
-These are reproduced as printed in the catalogue and look like misprints:
-
-- UF 24SS / UFD 24SS freezer temperature is printed as "−15°C ~ 20°C".
-- ECG 105 capacity is printed as "10" litres.
-- Galaxy vending machine: page 54 gives 1275 × 890 × 1940 mm, the page 55 table
-  gives 1180 × 890 × 1985 mm. The site uses the table.
-
-Images: the catalogue PDF stores product photos at about 100 ppi, so they are
-soft at large sizes; original photography would improve the hero and product
-pages. A few models share a series image, and the image-to-model match for the
-two floor-standing water dispensers and the EIM 26 is a best guess.
-
-The quote form is a mock submission unless `VITE_API_URL` is set.
-The customer names on the home and about pages are transcribed from the
-catalogue's logo pages; confirm permission to list them.
+Deploying: the host must serve `index.html` for unknown paths.

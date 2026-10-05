@@ -25,3 +25,5 @@
   .about__stats { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 520px) { .about__tech-grid { grid-template-columns: 1fr; } }
+
+.about__sub { font-size: var(--fs-4); margin: 2.5rem 0 1.25rem; }

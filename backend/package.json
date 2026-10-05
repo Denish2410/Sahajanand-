@@ -14,7 +14,8 @@
     "lint:fix": "eslint src/ tests/ --ext .js --fix",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\"",
     "seed:demo": "node scripts/seed.js --demo",
-    "make-admin": "node scripts/make-admin.js"
+    "make-admin": "node scripts/make-admin.js",
+    "dev:local": "node scripts/dev-local.js"
   },
   "keywords": [
     "ecommerce",

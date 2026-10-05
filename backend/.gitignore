@@ -9,3 +9,6 @@ coverage/
 *.log
 .DS_Store
 dist/
+
+# Local development database (npm run dev:local)
+.localdb/

@@ -236,3 +236,12 @@
 }
 .cart-drawer__clear { color: var(--ink-3); border-color: transparent; }
 .cart-drawer__clear:hover { color: var(--error); border-color: var(--error); background: transparent; }
+
+.cart-item--off { opacity: 0.7; }
+.cart-item__model:hover { color: var(--accent); }
+.cart-item__warn { font-size: 0.75rem; color: var(--error); font-weight: 600; }
+.cart-drawer__note { font-size: 0.75rem; color: var(--ink-3); margin-top: 0.5rem; }
+.cart-empty-icon { color: var(--ink-3); }
+.coupon-applied__badge { display: inline-flex; align-items: center; gap: 0.3rem; }
+.qty-btn[disabled], .cart-item__remove[disabled] { opacity: 0.4; cursor: not-allowed; }
+.cart-drawer__actions .btn[disabled] { cursor: not-allowed; }

@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles/tokens.css';
 import './styles/base.css';
+import './components/State/State.css';
 import { Router } from './router/index.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import App from './App.jsx';

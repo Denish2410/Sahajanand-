@@ -59,3 +59,15 @@
 .pd__price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.75rem; margin-top: 1.5rem; }
 .pd__price strong { font-stretch: 116%; font-size: var(--fs-4); font-weight: 750; }
 .pd__price span { font-size: var(--fs-0); color: var(--ink-3); }
+
+.pd__price s { color: var(--ink-3); font-size: var(--fs-2); }
+.pd__meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem 1.5rem; margin-top: 1.25rem; font-size: var(--fs-0); }
+.pd__meta dt { color: var(--ink-3); }
+.pd__meta dd { font-weight: 650; font-size: var(--fs-1); }
+.pd__in { color: var(--ok); }
+.pd__out { color: var(--error); }
+.pd__qty { display: inline-flex; align-items: center; border: 1.5px solid var(--ink); border-radius: var(--r-1); min-height: 46px; }
+.pd__qty button { width: 44px; height: 44px; font-size: 1.2rem; font-weight: 700; }
+.pd__qty button[disabled] { opacity: 0.35; cursor: not-allowed; }
+.pd__qty span { min-width: 2.2rem; text-align: center; font-weight: 700; }
+.pd__cta .btn[disabled] { background: var(--tile-2); color: var(--ink-3); cursor: not-allowed; opacity: 1; }

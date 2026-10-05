@@ -3,11 +3,20 @@ import { Link, useLocation, useNavigate } from '../../router/index.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { useCatalogue } from '../../hooks/useCatalogue.js';
 import { useLockScroll } from '../../hooks/useLockScroll.js';
-import { company } from '../../data/company.js';
-import { productImage } from '../../utils/format.js';
+import { productImage, telHref } from '../../utils/format.js';
 import Icon from '../Icon/Icon.jsx';
 import Search from '../Search/Search.jsx';
 import './Navbar.css';
+
+// Wordmark: store name, with the brand it is an authorised reseller of
+export function Logo() {
+  return (
+    <>
+      <span className="logo__name">SAHAJANAND<i aria-hidden="true" /></span>
+      <small className="logo__tag">Electronics · Authorised Elanpro reseller</small>
+    </>
+  );
+}
 
 const LINKS = [
   { to: '/solutions', label: 'Solutions' },
@@ -34,7 +43,8 @@ export default function Navbar() {
     document.addEventListener('keydown', key); document.addEventListener('mousedown', away);
     return () => { document.removeEventListener('keydown', key); document.removeEventListener('mousedown', away); };
   }, [acct]);
-  const signOut = () => { logout(); setAcct(false); setDrawer(false); navigate('/'); };
+  const signOut = async () => { setAcct(false); setDrawer(false); await logout(); navigate('/'); };
+  const announcement = settings.announcement || `Authorised Elanpro reseller · ${settings.serviceAreas.join(' & ')}`;
   useEffect(() => {
     if (!mega) return;
     const key = (e) => e.key === 'Escape' && setMega(false);
@@ -49,10 +59,11 @@ export default function Navbar() {
     <header className="nav">
       <div className="nav__util">
         <div className="wrap nav__util-in">
-          <span>{settings.announcement}</span>
+          <span>{announcement}</span>
           <span className="nav__util-contact">
-            <a href={`tel:${settings.supportPhone.replace(/[^+\d]/g, '')}`}><Icon name="phone" size={14} /> {settings.supportPhone}</a>
-            <a href={`mailto:${settings.supportEmail}`}><Icon name="mail" size={14} /> {settings.supportEmail}</a>
+            {settings.supportPhone && <a href={telHref(settings.supportPhone)}><Icon name="phone" size={14} /> {settings.supportPhone}</a>}
+            {settings.supportEmail && <a href={`mailto:${settings.supportEmail}`}><Icon name="mail" size={14} /> {settings.supportEmail}</a>}
+            {!settings.supportPhone && !settings.supportEmail && <Link to="/contact">Contact us</Link>}
           </span>
         </div>
       </div>
@@ -61,8 +72,8 @@ export default function Navbar() {
         <button className="nav__burger" onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
           <Icon name="menu" size={24} />
         </button>
-        <Link to="/" className="nav__logo" aria-label="Elanpro home">
-          ELANPRO<span aria-hidden="true" />
+        <Link to="/" className="nav__logo" aria-label={`${settings.storeName} home`}>
+          <Logo />
         </Link>
         <div className="nav__search"><Search /></div>
         <div className="nav__actions">
@@ -150,7 +161,7 @@ export default function Navbar() {
       {drawer && (
         <div className="drawer" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="drawer__head">
-            <span className="nav__logo">ELANPRO<span aria-hidden="true" /></span>
+            <span className="nav__logo"><Logo /></span>
             <button onClick={() => setDrawer(false)} aria-label="Close menu"><Icon name="close" size={24} /></button>
           </div>
           <div className="drawer__body">
@@ -173,14 +184,14 @@ export default function Navbar() {
                   <li><Link to="/account">Your account ({user.name.split(' ')[0]})</Link></li>
                   <li><Link to="/account/orders">Your orders</Link></li>
                   {isAdmin && <li><Link to="/admin">Admin panel</Link></li>}
-                  <li><Link to="/" onClick={signOut}>Sign out</Link></li>
+                  <li><Link to="/" onClick={(e) => { e.preventDefault(); signOut(); }}>Sign out</Link></li>
                 </>
               ) : (
                 <li><Link to="/login">Sign in or create account</Link></li>
               )}
             </ul>
             <button className="btn btn-primary btn-block" onClick={() => { setDrawer(false); openQuote(); }}>Request a quote</button>
-            <a className="drawer__phone" href={`tel:${company.phones[0].replace(/[^+\d]/g, '')}`}><Icon name="phone" size={16} /> {company.phones[0]}</a>
+            {settings.supportPhone && <a className="drawer__phone" href={telHref(settings.supportPhone)}><Icon name="phone" size={16} /> {settings.supportPhone}</a>}
           </div>
         </div>
       )}
