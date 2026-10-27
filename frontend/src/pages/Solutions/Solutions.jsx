@@ -7,7 +7,7 @@ import { useSeo } from '../../hooks/useSeo.js';
 import './Solutions.css';
 
 export default function Solutions() {
-  const { getCategory } = useCatalogue();
+  const { getCategory, counts } = useCatalogue();
   const { openQuote, settings } = useApp();
   useSeo({
     title: `Refrigeration solutions by industry | ${settings.storeName}`,
@@ -40,7 +40,7 @@ export default function Solutions() {
                     <Link to={`/category/${slug}`}>
                       <span className="solutions__thumb"><img src={productImage(c.image)} alt="" loading="lazy" /></span>
                       <strong>{c.name}</strong>
-                      {c.tagline && <small>{c.tagline}</small>}
+                      <small className="num">{counts[slug] || 0} products</small>
                     </Link>
                   </li>
                 );

@@ -42,9 +42,6 @@ export default function Home() {
   const [industry, setIndustry] = useState('');
   const current = sectors.find((i) => i.slug === industry) || sectors[0];
   const industryProducts = current ? current.categories.map((c) => byCategory(c)[0]).filter(Boolean).slice(0, 3) : [];
-  const industryTiles = industryProducts.length
-    ? industryProducts.map((p) => ({ key: p.id, to: `/product/${p.id}`, image: p.image, title: p.model, text: p.name }))
-    : (current?.categories || []).slice(0, 3).map(getCategory).map((c) => ({ key: c.slug, to: `/category/${c.slug}`, image: c.image, title: c.shortName, text: c.tagline }));
 
   return (
     <>
@@ -66,13 +63,13 @@ export default function Home() {
         <div className="section-head">
           <div>
             <h2>Browse the range</h2>
-            <p className="lede">Product lines with specifications from the Elanpro catalogue.</p>
+            <p className="lede">{categories.length} product lines, {Object.values(counts).reduce((a, b) => a + b, 0)} models, with specifications from the Elanpro catalogue.</p>
           </div>
           <Link to="/products" className="text-link">View all products</Link>
         </div>
         <div className="home-cats">
           {categories.map((c) => (
-            <CategoryCard key={c.slug} category={c} featured={Boolean(c.featured)} />
+            <CategoryCard key={c.slug} category={c} count={counts[c.slug] || 0} featured={Boolean(c.featured)} />
           ))}
         </div>
       </section>
@@ -128,10 +125,10 @@ export default function Home() {
                   ))}
                 </ul>
                 <div className="home-ind__products">
-                  {industryTiles.map((t) => (
-                    <Link key={t.key} to={t.to}>
-                      <img src={productImage(t.image)} alt="" loading="lazy" />
-                      <span><strong>{t.title}</strong>{t.text}</span>
+                  {industryProducts.map((p) => (
+                    <Link key={p.id} to={`/product/${p.id}`}>
+                      <img src={productImage(p.image)} alt="" loading="lazy" />
+                      <span><strong>{p.model}</strong>{p.name}</span>
                     </Link>
                   ))}
                 </div>
