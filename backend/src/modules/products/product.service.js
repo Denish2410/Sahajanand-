@@ -117,18 +117,27 @@ async function listProducts(query, includeInactive = false) {
   let total;
 
   if (query.search) {
-    // Try text search first
-    const textFilter = { ...filter, $text: { $search: query.search } };
-    total = await Product.countDocuments(textFilter);
+    let textMatched = false;
+    try {
+      // Try text search first
+      const textFilter = { ...filter, $text: { $search: query.search } };
+      total = await Product.countDocuments(textFilter);
 
-    if (total > 0) {
-      products = await Product.find(textFilter, { score: { $meta: 'textScore' } })
-        .sort({ score: { $meta: 'textScore' }, ...buildSort(query.sort) })
-        .skip(skip)
-        .limit(limit)
-        .populate('category', 'name slug')
-        .lean();
-    } else {
+      if (total > 0) {
+        textMatched = true;
+        products = await Product.find(textFilter, { score: { $meta: 'textScore' } })
+          .sort({ score: { $meta: 'textScore' }, ...buildSort(query.sort) })
+          .skip(skip)
+          .limit(limit)
+          .populate('category', 'name slug')
+          .lean();
+      }
+    } catch (_textErr) {
+      // Text index not built or search syntax error; fallback to regex
+      textMatched = false;
+    }
+
+    if (!textMatched) {
       // Regex fallback (partial words, model numbers typed without spaces)
       const rx = new RegExp(escapeRegex(query.search).replace(/\s+/g, '\\s*'), 'i');
       const regexFilter = {
