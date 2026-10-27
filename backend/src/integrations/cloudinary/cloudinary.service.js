@@ -96,6 +96,66 @@ async function deleteMultipleImages(publicIds) {
 }
 
 /**
+ * Test connectivity and credentials with Cloudinary API.
+ * @returns {Promise<object>}
+ */
+async function ping() {
+  try {
+    return await cloudinary.api.ping();
+  } catch (err) {
+    const errorMsg = err.message || err.error?.message || err.error || JSON.stringify(err);
+    logger.error(`Cloudinary ping failed: ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Upload an image buffer directly to Cloudinary.
+ * @param {Buffer} buffer - Image buffer
+ * @param {string} folder - Cloudinary folder
+ * @param {object} [options={}] - Additional upload options
+ * @returns {Promise<{url: string, publicId: string}>}
+ */
+async function uploadFromBuffer(buffer, folder = 'sahajanand', options = {}) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'image',
+        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+        ...options,
+      },
+      (error, result) => {
+        if (error) {
+          logger.error(`Cloudinary stream upload failed: ${error.message}`);
+          return reject(error);
+        }
+        resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
+      }
+    );
+    uploadStream.end(buffer);
+  });
+}
+
+/**
+ * Generate an optimized Cloudinary delivery URL with transformations.
+ * @param {string} publicId - Cloudinary public ID
+ * @param {object} [options={}] - Transformations (e.g. width, height, crop)
+ * @returns {string} Optimized URL
+ */
+function getOptimizedUrl(publicId, options = {}) {
+  return cloudinary.url(publicId, {
+    fetch_format: 'auto',
+    quality: 'auto',
+    secure: true,
+    ...options,
+  });
+}
+
+/**
  * Delete a temp file from disk (non-blocking, never throws).
  * @param {string} filePath
  */
@@ -110,8 +170,11 @@ function deleteTempFile(filePath) {
 }
 
 module.exports = {
+  ping,
   uploadImage,
   uploadMultipleImages,
+  uploadFromBuffer,
+  getOptimizedUrl,
   deleteImage,
   deleteMultipleImages,
   deleteTempFile,

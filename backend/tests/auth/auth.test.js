@@ -73,10 +73,13 @@ describe('Auth Module', () => {
     });
 
     it('should assign admin role if email is in ADMIN_EMAILS', async () => {
+      const config = require('../../src/config/env');
+      const adminEmail = config.adminEmails[0] || 'admin@example.com';
+
       firebaseService.verifyIdToken.mockResolvedValue({
         uid: 'admin-uid-456',
         name: 'Admin User',
-        email: 'owner@example.com',
+        email: adminEmail,
         email_verified: true,
       });
 

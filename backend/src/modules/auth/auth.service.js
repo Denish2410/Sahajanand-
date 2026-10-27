@@ -27,7 +27,7 @@ function entitledRole(email, emailVerified) {
 async function loginWithFirebase(idToken, profile = {}) {
   const decodedToken = await firebaseService.verifyIdToken(idToken);
 
-  const { uid, name, picture, email_verified } = decodedToken;
+  const { uid, name, picture, email_verified, phone_number } = decodedToken;
 
   if (!decodedToken.email) {
     throw ApiError.badRequest('Your sign-in did not include an email address');
@@ -59,32 +59,41 @@ async function loginWithFirebase(idToken, profile = {}) {
       firebaseUid: uid,
       name: name || profile.name || email.split('@')[0],
       email,
-      phone: profile.phone || '',
+      phone: profile.phone || phone_number || '',
       photoURL: picture || '',
       emailVerified,
       role: role || ROLES.USER,
       lastLoginAt: new Date(),
     });
     logger.info(`New user created: ${email} (role: ${user.role})`);
-    return user;
+  } else {
+    // Existing user: keep the profile they edited, refresh what Firebase owns
+    user.emailVerified = emailVerified;
+    user.lastLoginAt = new Date();
+    if (picture) user.photoURL = picture;
+    if (!user.phone && (profile.phone || phone_number)) {
+      user.phone = profile.phone || phone_number;
+    }
+
+    // Promote from the allow-lists; never demote here (roles granted from the
+    // admin panel are kept).
+    if (role === ROLES.SUPER_ADMIN && user.role !== ROLES.SUPER_ADMIN) {
+      user.role = ROLES.SUPER_ADMIN;
+    } else if (role === ROLES.ADMIN && user.role === ROLES.USER) {
+      user.role = ROLES.ADMIN;
+    }
+
+    await user.save();
+    logger.info(`User logged in: ${email}`);
   }
 
-  // Existing user: keep the profile they edited, refresh what Firebase owns
-  user.emailVerified = emailVerified;
-  user.lastLoginAt = new Date();
-  if (picture) user.photoURL = picture;
-  if (!user.phone && profile.phone) user.phone = profile.phone;
-
-  // Promote from the allow-lists; never demote here (roles granted from the
-  // admin panel are kept).
-  if (role === ROLES.SUPER_ADMIN && user.role !== ROLES.SUPER_ADMIN) {
-    user.role = ROLES.SUPER_ADMIN;
-  } else if (role === ROLES.ADMIN && user.role === ROLES.USER) {
-    user.role = ROLES.ADMIN;
+  if (user.role === ROLES.ADMIN || user.role === ROLES.SUPER_ADMIN) {
+    try {
+      await firebaseService.setCustomUserClaims(uid, { role: user.role });
+    } catch (_err) {
+      // Non-fatal if setting custom claim fails (e.g. testing or limited permissions)
+    }
   }
-
-  await user.save();
-  logger.info(`User logged in: ${email}`);
 
   return user;
 }
