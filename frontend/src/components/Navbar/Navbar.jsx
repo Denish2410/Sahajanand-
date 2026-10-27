@@ -29,7 +29,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [acct, setAcct] = useState(false);
   const acctRef = useRef(null);
-  const { categories, counts } = useCatalogue();
+  const { categories } = useCatalogue();
   const { pathname } = useLocation();
   const [mega, setMega] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -144,7 +144,7 @@ export default function Navbar() {
                       <span className="mega__thumb"><img src={productImage(c.image)} alt="" loading="lazy" /></span>
                       <span>
                         <strong>{c.name}</strong>
-                        <small className="num">{counts[c.slug] || 0} products</small>
+                        {c.tagline && <small>{c.tagline}</small>}
                       </span>
                     </Link>
                   </li>
@@ -170,7 +170,7 @@ export default function Navbar() {
               {categories.map((c) => (
                 <li key={c.slug}>
                   <Link to={`/category/${c.slug}`}>
-                    {c.name} <span className="muted num">{counts[c.slug] || 0}</span>
+                    {c.name}
                   </Link>
                 </li>
               ))}

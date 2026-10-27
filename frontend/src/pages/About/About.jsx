@@ -29,7 +29,7 @@ export default function About() {
         <img src={sceneImage('chef')} alt="A chef plating food in a professional kitchen" />
         <div className="about__text">
           <p>We supply Elanpro commercial refrigeration to kitchens, bars, retailers and institutions across {areas}, Gujarat.</p>
-          <p>Browse {products.length} models across {categories.length} product lines with full specifications, order the models in stock online, or ask us for a quotation for your project.</p>
+          <p>Browse {products.length > 0 ? `${products.length} models across ` : ''}{categories.length} product lines with full specifications, order the models in stock online, or ask us for a quotation for your project.</p>
           <ul className="about__list">
             {categories.map((c) => <li key={c.slug}><Link to={`/category/${c.slug}`}>{c.name}</Link></li>)}
           </ul>

@@ -2,6 +2,7 @@
 // Filter groups are built from the data, so a filter only appears where the
 // catalogue gives at least two different values for it.
 import { useEffect, useMemo, useState } from 'react';
+import { useApp } from '../../context/AppContext.jsx';
 import { useCatalogue } from '../../hooks/useCatalogue.js';
 import { searchProducts } from '../../utils/search.js';
 import { CAPACITY_BUCKETS, capacityBucket } from '../../utils/specs.js';
@@ -20,6 +21,7 @@ const SORTS = {
 
 export default function ProductBrowser({ products, showCategory = false, initialQuery = '', resetKey }) {
   const { getCategory } = useCatalogue();
+  const { openQuote } = useApp();
   const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState('catalogue');
   const [selected, setSelected] = useState({});
@@ -76,6 +78,17 @@ export default function ProductBrowser({ products, showCategory = false, initial
     });
   const clear = () => { setSelected({}); setQuery(''); };
   const activeCount = Object.values(selected).reduce((n, v) => n + v.length, 0);
+
+  // Nothing listed here yet: no filters or search to clear, so offer a quote instead
+  if (products.length === 0) {
+    return (
+      <div className="empty">
+        <h3>Products coming soon</h3>
+        <p className="muted">We are adding the models in this range. Tell us what you need and our sales team will send you a quotation.</p>
+        <button className="btn btn-primary" onClick={() => openQuote()}>Request a quote</button>
+      </div>
+    );
+  }
 
   return (
     <div className={`browser ${groups.length === 0 ? 'browser--nofilter' : ''}`}>

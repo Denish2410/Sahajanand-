@@ -28,7 +28,7 @@ function buildStops(products) {
 
 export default function Hero() {
   const { openQuote, settings } = useApp();
-  const { products, getCategory } = useCatalogue();
+  const { products, categories, getCategory } = useCatalogue();
   const STOPS = useMemo(() => buildStops(products), [products]);
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -42,6 +42,7 @@ export default function Hero() {
 
   const stop = STOPS[active] || null;
   const product = stop?.product;
+  const fallback = STOPS.length ? null : categories.find((c) => c.featured) || categories[0];
   const title = settings.heroTitle || 'Every temperature your business runs on.';
   const lede = settings.heroLede || `Commercial refrigeration for kitchens, bars, retail, ice and vending from ${settings.storeName}, authorised Elanpro reseller serving ${settings.serviceAreas.join(' and ')}.`;
 
@@ -66,6 +67,15 @@ export default function Hero() {
                 <strong>{product.model}</strong>
                 <span>{product.name}</span>
                 <small>{getCategory(product.category)?.name}</small>
+              </span>
+            </Link>
+          )}
+          {fallback && (
+            <Link to={`/category/${fallback.slug}`} className="hero__product">
+              <img src={productImage(fallback.image)} alt={fallback.name} />
+              <span className="hero__tag">
+                <strong>{fallback.shortName}</strong>
+                <span>{fallback.tagline}</span>
               </span>
             </Link>
           )}

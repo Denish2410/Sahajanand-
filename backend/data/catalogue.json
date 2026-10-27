@@ -15,11 +15,87 @@
       "subcategories": [
         "Reach-In Premium",
         "Undercounter Premium",
+        "Free Standing Cooler / Freezer",
+        "Saladette Counter",
         "Undercounter with Prep Table",
+        "Saladette Counter with Prep Table",
+        "Sushi & Saladette Counter",
+        "Ice Cream Buffet Freezer",
+        "Frost Top",
+        "Cooling Well",
         "Blast Chiller & Freezer",
-        "Reach-In Static"
+        "Reach-In & Undercounter Frost Free Classic",
+        "Reach-In & Undercounter Static"
       ],
       "sortOrder": 1
+    },
+    {
+      "slug": "retail-solution",
+      "name": "Retail Solution",
+      "shortName": "Retail",
+      "tagline": "For food and beverage retail",
+      "description": "Counter-top coolers, glass-top and hard-top freezers, milk coolers and upright showcases tropicalised for Indian weather.",
+      "image": {
+        "url": "/images/products/ecg-3door-hero.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/retail.jpg",
+      "isFeatured": true,
+      "subcategories": [
+        "Special Products (Counter Top Showcase / Can Cooler)",
+        "Milk Cooler",
+        "Premium Series Flat Glass Top Freezer",
+        "Premium Series Curve Glass Top Freezer",
+        "Premium Series Hard Top (Milk Cooler)",
+        "Premium Series Hard Top (FOW)",
+        "Premium Series Hard Top Freezer cum Chiller",
+        "Premium Series Hard Top Combi",
+        "Upright Showcase Chiller",
+        "Upright Showcase Freezer"
+      ],
+      "sortOrder": 2
+    },
+    {
+      "slug": "pharma",
+      "name": "Pharma",
+      "shortName": "Pharma",
+      "tagline": "Cold storage for pharmacies and labs",
+      "description": "Pharmacy refrigerators, laboratory fridges and freezers with precise temperature control for vaccines, medicines and samples.",
+      "image": {
+        "url": "/images/products/lab-fridge.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/lab.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Ultra Low Freezer (-86°C)",
+        "Ultra Low Freezer (-40°C)",
+        "Laboratory Freezer",
+        "Laboratory Refrigerator",
+        "Portable Vaccine Freezer"
+      ],
+      "sortOrder": 3
+    },
+    {
+      "slug": "supermarket",
+      "name": "Supermarket",
+      "shortName": "Supermarket",
+      "tagline": "Display chillers for supermarkets",
+      "description": "Multideck chillers and display refrigeration built for supermarket aisles and high-footfall stores.",
+      "image": {
+        "url": "/images/products/rf-multideck.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/supermarket.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Plug-in Multideck Chiller",
+        "Remote Multideck Chiller",
+        "Plug-in / Remote Chiller Cabinet 2/3 Doors",
+        "Plug-in Freezer Cabinet 2/3 Doors",
+        "Remote Freezer Slim Cabinet 2/3 Doors"
+      ],
+      "sortOrder": 4
     },
     {
       "slug": "bar-refrigeration",
@@ -36,29 +112,47 @@
       "subcategories": [
         "Wine Chillers",
         "Back Bars",
-        "Undercounter Bars"
+        "Undercounter Bars",
+        "Beer & Beverage"
       ],
-      "sortOrder": 2
+      "sortOrder": 5
     },
     {
-      "slug": "retail-solution",
-      "name": "Retail Solution",
-      "shortName": "Retail",
-      "tagline": "For food and beverage retail",
-      "description": "Counter-top coolers, glass-top and hard-top freezers, milk coolers and upright showcases tropicalised for Indian weather.",
+      "slug": "cold-room",
+      "name": "Cold Room",
+      "shortName": "Cold Room",
+      "tagline": "Walk-in cold and freezer rooms",
+      "description": "Walk-in cold rooms with condensing units and evaporators for bulk storage of food, produce and pharma stock.",
       "image": {
-        "url": "/images/products/ecg-3door-hero.webp",
+        "url": "/images/products/cold-room.webp",
         "publicId": ""
       },
-      "scene": "/images/scenes/retail.jpg",
-      "isFeatured": true,
+      "scene": "/images/scenes/store.jpg",
+      "isFeatured": false,
       "subcategories": [
-        "Flat Glass Top",
-        "Hard Top",
-        "Upright Showcase Chiller",
-        "Upright Showcase Freezer"
+        "Chiller Unit (2°C to 6°C)",
+        "Freezer Unit (-16°C to -20°C)"
       ],
-      "sortOrder": 3
+      "sortOrder": 6
+    },
+    {
+      "slug": "confectionery-showcase",
+      "name": "Confectionery Showcase",
+      "shortName": "Confectionery",
+      "tagline": "Showcases for cakes and sweets",
+      "description": "Refrigerated and ambient display cabinets for cakes, pastries and confectionery.",
+      "image": {
+        "url": "/images/products/edc-cakes.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/bakery.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Platinum",
+        "Classic",
+        "Counter Top"
+      ],
+      "sortOrder": 7
     },
     {
       "slug": "ice-machine",
@@ -73,10 +167,82 @@
       "scene": "/images/scenes/beach.jpg",
       "isFeatured": false,
       "subcategories": [
-        "Ice Machines",
-        "Ice Flakers"
+        "Ice Cube Machine",
+        "Ice Flaker"
       ],
-      "sortOrder": 4
+      "sortOrder": 8
+    },
+    {
+      "slug": "beverage-solution",
+      "name": "Beverage Solution",
+      "shortName": "Beverage",
+      "tagline": "Draft beer and beverage cooling",
+      "description": "Beer towers, kegerators and beverage cooling systems for bars, restaurants and events.",
+      "image": {
+        "url": "/images/products/beer-tower.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/bar.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Juice Dispenser",
+        "Slush Dispenser",
+        "Softy Ice Cream Machine"
+      ],
+      "sortOrder": 9
+    },
+    {
+      "slug": "mini-bar-mini-fridge",
+      "name": "Mini Bar & Mini Fridge",
+      "shortName": "Mini Bar",
+      "tagline": "Compact cooling for rooms and counters",
+      "description": "Compact mini bars and mini fridges for hotel rooms, offices and small spaces.",
+      "image": {
+        "url": "/images/products/mini-lady.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/store.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Mini Bar",
+        "Mini Fridge"
+      ],
+      "sortOrder": 10
+    },
+    {
+      "slug": "scooping-parlour",
+      "name": "Scooping Parlour",
+      "shortName": "Scooping",
+      "tagline": "Ice cream scooping cabinets",
+      "description": "Ice cream scooping and display freezers for parlours and dessert shops.",
+      "image": {
+        "url": "/images/products/scs.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/parlour.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Scooping Parlour",
+        "Self Service & Serve Over Counters"
+      ],
+      "sortOrder": 11
+    },
+    {
+      "slug": "water-cooler",
+      "name": "Water Cooler",
+      "shortName": "Water Cooler",
+      "tagline": "Drinking water coolers",
+      "description": "Water coolers for offices, schools, factories and public places.",
+      "image": {
+        "url": "/images/products/frozone.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/store.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Stainless Steel Water Cooler"
+      ],
+      "sortOrder": 12
     },
     {
       "slug": "vending-machine",
@@ -91,1971 +257,35 @@
       "scene": "/images/scenes/vending.jpg",
       "isFeatured": false,
       "subcategories": [
-        "Snacks & Beverages",
+        "Snacks & Beverages Vending",
         "Elevator Vending",
-        "Frozen Vending",
+        "Frozen Food & Ice Cream Vending",
+        "QR Code Vending",
         "Smart Lockers"
       ],
-      "sortOrder": 5
+      "sortOrder": 13
+    },
+    {
+      "slug": "water-dispenser",
+      "name": "Water Dispenser",
+      "shortName": "Dispenser",
+      "tagline": "Hot and cold water dispensers",
+      "description": "Hot, cold and ambient water dispensers for homes, offices and hospitality.",
+      "image": {
+        "url": "/images/products/life.webp",
+        "publicId": ""
+      },
+      "scene": "/images/scenes/store.jpg",
+      "isFeatured": false,
+      "subcategories": [
+        "Counter Top",
+        "Floor Standing (non-refrigerated cabinet)",
+        "Floor Standing (refrigerated cabinet)"
+      ],
+      "sortOrder": 14
     }
   ],
-  "products": [
-    {
-      "slug": "egn-1500-c4",
-      "model": "EGN 1500 C4",
-      "name": "Reach-In Premium Cooler",
-      "brand": "Elanpro",
-      "category": "professional-kitchen",
-      "subcategory": "Reach-In Premium",
-      "familyId": "reach-in-premium",
-      "familyName": "Reach-In Premium",
-      "description": "All-in-one reach-in with ducted cold-air distribution for uniform cooling on every shelf and 100 mm insulation for better hold-over and pull-down.",
-      "price": 185000,
-      "mrp": 185000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EGN-1500-C.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/egn-1500.webp",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/egn-glass-2d.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "1300 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1420 × 875 × 2090 mm"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 8°C"
-        },
-        {
-          "key": "GN compatibility",
-          "value": "2 × GN 1/1"
-        },
-        {
-          "key": "Refrigerant",
-          "value": "R290"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "6"
-        },
-        {
-          "key": "Type of cooling",
-          "value": "Ventilated cooling (frost free)"
-        }
-      ],
-      "features": [
-        "Flexible space utilisation, offers up to 100% extra storage",
-        "No sharp edges, effortless cleaning",
-        "Holds up to 13 GN pans",
-        "Cold air distributed through duct: uniform on each shelf, no contamination through moisture or air",
-        "100 mm insulation: better hold-over, better pull-down, low power consumption",
-        "Auto defrosting, digital controller, adjustable shelves",
-        "Tropicalised at 43°C ambient"
-      ],
-      "applications": [],
-      "badges": [
-        "SS 304",
-        "Frost Free",
-        "Digital Controller",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 8
-      },
-      "tempClass": "Chiller",
-      "capacityL": 1300,
-      "refrigerant": "R290",
-      "cooling": "Ventilated cooling (frost free)"
-    },
-    {
-      "slug": "egn-2100-c",
-      "model": "EGN 2100 C",
-      "name": "Undercounter Premium Cooler",
-      "brand": "Elanpro",
-      "category": "professional-kitchen",
-      "subcategory": "Undercounter Premium",
-      "familyId": "undercounter-premium",
-      "familyName": "Undercounter Premium",
-      "description": "GN 1/1 undercounter on heavy-duty lockable castors. Also available in 3 door, with 100 or 150 mm back splash, overhead shelf and 2 or 3 drawer options.",
-      "price": 98000,
-      "mrp": 98000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EGN-2100-C.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/egn-uc.webp",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/egn-uc-drawer.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "265 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1360 × 700 × 860 mm"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 8°C"
-        },
-        {
-          "key": "GN compatibility",
-          "value": "1 × GN 1/1"
-        },
-        {
-          "key": "Refrigerant",
-          "value": "R600a"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "2"
-        },
-        {
-          "key": "Type of cooling",
-          "value": "Ventilated cooling (frost free)"
-        }
-      ],
-      "features": [
-        "Heavy-duty lockable castors",
-        "Digital controller, adjustable shelves",
-        "Back splash available in 100 / 150 mm",
-        "Overhead shelf option",
-        "2 and 3 drawer options"
-      ],
-      "applications": [],
-      "badges": [
-        "SS 304",
-        "Frost Free",
-        "Digital Controller",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 8
-      },
-      "tempClass": "Chiller",
-      "capacityL": 265,
-      "refrigerant": "R600a",
-      "cooling": "Ventilated cooling (frost free)"
-    },
-    {
-      "slug": "esh-2000",
-      "model": "ESH 2000",
-      "name": "Saladette Counter with Prep Table",
-      "brand": "Elanpro",
-      "category": "professional-kitchen",
-      "subcategory": "Undercounter with Prep Table",
-      "familyId": "saladette-prep-table",
-      "familyName": "Saladette Counter with Prep Table",
-      "description": "Undercounter with prep table and ventilated cooling, on heavy-duty lockable castors. GN pans are optional and not supplied with the equipment.",
-      "price": 135000,
-      "mrp": 135000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/ESH-2000-5.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/esh-3000.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "337 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1510 × 800 × 1085 mm"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 8°C"
-        },
-        {
-          "key": "GN compatibility",
-          "value": "7 × GN 1/3"
-        },
-        {
-          "key": "Climate class",
-          "value": "38°C"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "2"
-        },
-        {
-          "key": "Type of cooling",
-          "value": "Ventilated cooling"
-        }
-      ],
-      "features": [
-        "Heavy-duty lockable castors",
-        "GN pan compatible",
-        "Environment-friendly refrigerant",
-        "Removable gasket",
-        "Optional: heavy-duty adjustable SS legs",
-        "HACCP compliance (all models)"
-      ],
-      "applications": [],
-      "badges": [
-        "SS 304",
-        "HACCP",
-        "Frost Free",
-        "Digital Controller"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 8
-      },
-      "tempClass": "Chiller",
-      "capacityL": 337,
-      "refrigerant": "",
-      "cooling": "Ventilated cooling"
-    },
-    {
-      "slug": "ed10",
-      "model": "ED10",
-      "name": "Blast Chiller / Freezer",
-      "brand": "Elanpro",
-      "category": "professional-kitchen",
-      "subcategory": "Blast Chiller & Freezer",
-      "familyId": "blast-chiller",
-      "familyName": "Blast Chiller / Freezer",
-      "description": "Brings food from 70°C to 4°C within 90 minutes to inhibit bacterial growth, and from 70°C to −18°C within 240 minutes, forming microcrystals that protect food structure.",
-      "price": 340000,
-      "mrp": 340000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/ED-10-2.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/ed10.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "368 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "800 × 815 × 1645 mm"
-        },
-        {
-          "key": "Operating temperature",
-          "value": "−35°C"
-        },
-        {
-          "key": "Chilling capacity (70°C to 4°C in 90 min)",
-          "value": "40 kg"
-        },
-        {
-          "key": "Freezing capacity (70°C to −18°C in 240 min)",
-          "value": "28 kg"
-        },
-        {
-          "key": "GN 1/1 tray compatibility",
-          "value": "10"
-        },
-        {
-          "key": "Power supply",
-          "value": "230 V / 50 Hz"
-        },
-        {
-          "key": "Cooling mode",
-          "value": "Ventilated"
-        }
-      ],
-      "features": [
-        "Blast chilling: 70°C to 4°C in 90 minutes",
-        "Shock freezing: 70°C to −18°C in 240 minutes",
-        "Rapid chilling with ventilated cooling",
-        "Digital controller",
-        "75 mm insulation",
-        "GN 1/1 trays are not part of the equipment"
-      ],
-      "applications": [
-        "Meat Processing",
-        "Hotels & Restaurants",
-        "Dairy",
-        "Food Processing",
-        "Ice Cream",
-        "Healthcare"
-      ],
-      "badges": [
-        "SS 304",
-        "Digital Controller",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": -35,
-        "max": -35
-      },
-      "tempClass": "Freezer",
-      "capacityL": 368,
-      "refrigerant": "",
-      "cooling": "Ventilated"
-    },
-    {
-      "slug": "ri-551-c",
-      "model": "RI 551 C",
-      "name": "Reach-In Static Cooler",
-      "brand": "Elanpro",
-      "category": "professional-kitchen",
-      "subcategory": "Reach-In Static",
-      "familyId": "reach-in-static",
-      "familyName": "Reach-In Static",
-      "description": "Static-cooling reach-in with self-closing doors, lock and heavy-duty lockable castors.",
-      "price": 68795,
-      "mrp": 68795,
-      "priceSource": "listed",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/RI-551C-and-RI-551-F.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/ri-551.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "500 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "680 × 710 × 2000 mm"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 8°C"
-        },
-        {
-          "key": "Refrigerant",
-          "value": "R290"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "3"
-        },
-        {
-          "key": "Material",
-          "value": "SS 201"
-        },
-        {
-          "key": "Type of cooling",
-          "value": "Static cooling"
-        }
-      ],
-      "features": [
-        "Removable gasket",
-        "Heavy-duty lockable castors",
-        "Lock",
-        "Self-closing door",
-        "Adjustable shelves",
-        "Optional: single or multi door, heavy-duty adjustable SS legs",
-        "HACCP compliance (all models)"
-      ],
-      "applications": [],
-      "badges": [
-        "HACCP",
-        "Digital Controller",
-        "Eco-Friendly Refrigerant",
-        "SS 201"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 8
-      },
-      "tempClass": "Chiller",
-      "capacityL": 500,
-      "refrigerant": "R290",
-      "cooling": "Static cooling"
-    },
-    {
-      "slug": "ewg-51-d",
-      "model": "EWG 51 D",
-      "name": "Wine Cooler",
-      "brand": "Elanpro",
-      "category": "bar-refrigeration",
-      "subcategory": "Wine Chillers",
-      "familyId": "wine-chillers",
-      "familyName": "Wine Cooler",
-      "description": "Dual temperature zone wine cooler with pull-out beech wooden shelves, an anti-vibration system and a double-layer anti-UV tinted glass door. Climate class 35°C.",
-      "price": 62000,
-      "mrp": 62000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/ewg-51d.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "595 × 575 × 820 mm"
-        },
-        {
-          "key": "Capacity (standard 750 ml)",
-          "value": "46 bottles"
-        },
-        {
-          "key": "Power consumption",
-          "value": "70 W"
-        },
-        {
-          "key": "Temperature range",
-          "value": "5°C to 12°C & 12°C to 22°C"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "6"
-        },
-        {
-          "key": "Adjustable feet / lock",
-          "value": "Yes / Yes"
-        },
-        {
-          "key": "Climate class",
-          "value": "35°C"
-        }
-      ],
-      "features": [
-        "Actual and set temperature display",
-        "Lock",
-        "No frost",
-        "Elegant stainless steel door frame",
-        "Double-layer anti-UV tinted glass door",
-        "Cabinet colour: black",
-        "Charcoal filter",
-        "Blue LED lighting"
-      ],
-      "applications": [],
-      "badges": [
-        "Dual Temperature Zone",
-        "Frost Free"
-      ],
-      "temp": {
-        "min": 5,
-        "max": 22
-      },
-      "tempClass": "Chiller",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "ewg-130-d",
-      "model": "EWG 130 D",
-      "name": "Wine Cooler",
-      "brand": "Elanpro",
-      "category": "bar-refrigeration",
-      "subcategory": "Wine Chillers",
-      "familyId": "wine-chillers",
-      "familyName": "Wine Cooler",
-      "description": "Dual temperature zone wine cooler with pull-out beech wooden shelves, an anti-vibration system and a double-layer anti-UV tinted glass door. Climate class 35°C.",
-      "price": 110000,
-      "mrp": 110000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EWG-130-D-7-Photoroom-1.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/ewg-130d.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "595 × 680 × 1417 mm"
-        },
-        {
-          "key": "Capacity (standard 750 ml)",
-          "value": "121 bottles"
-        },
-        {
-          "key": "Power consumption",
-          "value": "120 W"
-        },
-        {
-          "key": "Temperature range",
-          "value": "5°C to 12°C & 12°C to 22°C"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "11"
-        },
-        {
-          "key": "Adjustable feet / lock",
-          "value": "Yes / Yes"
-        },
-        {
-          "key": "Climate class",
-          "value": "35°C"
-        }
-      ],
-      "features": [
-        "Actual and set temperature display",
-        "Lock",
-        "No frost",
-        "Elegant stainless steel door frame",
-        "Double-layer anti-UV tinted glass door",
-        "Cabinet colour: black",
-        "Charcoal filter",
-        "Blue LED lighting"
-      ],
-      "applications": [],
-      "badges": [
-        "Dual Temperature Zone",
-        "Frost Free"
-      ],
-      "temp": {
-        "min": 5,
-        "max": 22
-      },
-      "tempClass": "Chiller",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "ebb-2d-2d-ss",
-      "model": "EBB 2D / 2D SS",
-      "name": "Back Bar",
-      "brand": "Elanpro",
-      "category": "bar-refrigeration",
-      "subcategory": "Back Bars",
-      "familyId": "back-bars",
-      "familyName": "Back Bar",
-      "description": "Back bar cooler with double-layer glass, self-closing doors and internal LED light. Also available in 3 door. Climate class 35°C.",
-      "price": 58000,
-      "mrp": 58000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EBB-2D-2D-SS-1.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/ebb-2d.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Description",
-          "value": "2 door back bar"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "900 × 535 × 895 mm"
-        },
-        {
-          "key": "Capacity",
-          "value": "202 L"
-        },
-        {
-          "key": "Power consumption",
-          "value": "230 W"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 10°C"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "2 × 2"
-        },
-        {
-          "key": "Castors / lock",
-          "value": "No / Yes"
-        },
-        {
-          "key": "Climate class",
-          "value": "35°C"
-        }
-      ],
-      "features": [
-        "Double-layer glass",
-        "Digital controller",
-        "Self-closing door",
-        "Internal LED light",
-        "Lock"
-      ],
-      "applications": [],
-      "badges": [
-        "Digital Controller"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 10
-      },
-      "tempClass": "Chiller",
-      "capacityL": 202,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "egf-5g",
-      "model": "EGF 5G",
-      "name": "Glass Froster",
-      "brand": "Elanpro",
-      "category": "bar-refrigeration",
-      "subcategory": "Undercounter Bars",
-      "familyId": "undercounter-bars",
-      "familyName": "Undercounter Bar",
-      "description": "Glass froster and undercounter bars with double insulated glass, lockable doors and internal LED light.",
-      "price": 48000,
-      "mrp": 48000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/egf-5g.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Description",
-          "value": "1 door glass froster"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "595 × 525 × 875 mm"
-        },
-        {
-          "key": "Capacity",
-          "value": "100 L"
-        },
-        {
-          "key": "Power consumption",
-          "value": "280 W"
-        },
-        {
-          "key": "Temperature range",
-          "value": "−2°C to −10°C"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "2"
-        },
-        {
-          "key": "Castors",
-          "value": "No"
-        }
-      ],
-      "features": [
-        "Double insulated glass",
-        "Adjustable shelves",
-        "Lockable doors",
-        "Internal LED light"
-      ],
-      "applications": [],
-      "badges": [],
-      "temp": {
-        "min": -10,
-        "max": -2
-      },
-      "tempClass": "Freezer",
-      "capacityL": 100,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "egn-2100-cg",
-      "model": "EGN 2100 CG",
-      "name": "Undercounter Bar",
-      "brand": "Elanpro",
-      "category": "bar-refrigeration",
-      "subcategory": "Undercounter Bars",
-      "familyId": "undercounter-bars",
-      "familyName": "Undercounter Bar",
-      "description": "Glass froster and undercounter bars with double insulated glass, lockable doors and internal LED light.",
-      "price": 105000,
-      "mrp": 105000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EGN-2100-CG.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/egn-2100-cg.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Description",
-          "value": "2 door undercounter bar"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1360 × 700 × 860 mm"
-        },
-        {
-          "key": "Capacity",
-          "value": "265 L"
-        },
-        {
-          "key": "Power consumption",
-          "value": "396 W"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 10°C"
-        },
-        {
-          "key": "No. of shelves",
-          "value": "2"
-        },
-        {
-          "key": "Castors",
-          "value": "Yes"
-        }
-      ],
-      "features": [
-        "Double insulated glass",
-        "Adjustable shelves",
-        "Lockable doors",
-        "Internal LED light"
-      ],
-      "applications": [],
-      "badges": [],
-      "temp": {
-        "min": 2,
-        "max": 10
-      },
-      "tempClass": "Chiller",
-      "capacityL": 265,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "eim-61-bw",
-      "model": "EIM 61 BW",
-      "name": "Ice Machine",
-      "brand": "Elanpro",
-      "category": "ice-machine",
-      "subcategory": "Ice Machines",
-      "familyId": "ice-machines",
-      "familyName": "Ice Machine",
-      "description": "Air-cooled ice machines with vertical evaporators and SS 304 bodies. Available in flake and dice ice options, with in-built or separate storage bins.",
-      "price": 72000,
-      "mrp": 72000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/eim-bw.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Compatible bin model",
-          "value": "In-built"
-        },
-        {
-          "key": "Rated capacity",
-          "value": "55 kg / 24 hrs"
-        },
-        {
-          "key": "Bin size",
-          "value": "18 kg"
-        },
-        {
-          "key": "Machine dimensions (W × D × H)",
-          "value": "500 × 590 × 850 mm"
-        },
-        {
-          "key": "Power consumption",
-          "value": "360 W"
-        },
-        {
-          "key": "Water consumption / 24 hrs",
-          "value": "80 L"
-        },
-        {
-          "key": "Cube size",
-          "value": "22 × 22 × 22 mm"
-        },
-        {
-          "key": "Electricals",
-          "value": "220 V / 1 Ph / 50 Hz"
-        }
-      ],
-      "features": [
-        "Low energy consumption: designed for maximum efficiency to reduce operating costs",
-        "Low water consumption: conserves water without compromising performance",
-        "Air-cooled system for consistent operation in varied environments",
-        "Control board with display for monitoring and adjustments",
-        "Vertical evaporator for reliable ice formation and improved efficiency"
-      ],
-      "applications": [
-        "Bar",
-        "HoReCa",
-        "Hospitals",
-        "Sports",
-        "Pharma"
-      ],
-      "badges": [
-        "SS 304",
-        "Energy Efficient"
-      ],
-      "temp": null,
-      "tempClass": "",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "eim-101",
-      "model": "EIM 101",
-      "name": "Ice Machine",
-      "brand": "Elanpro",
-      "category": "ice-machine",
-      "subcategory": "Ice Machines",
-      "familyId": "ice-machines",
-      "familyName": "Ice Machine",
-      "description": "Air-cooled ice machines with vertical evaporators and SS 304 bodies. Available in flake and dice ice options, with in-built or separate storage bins.",
-      "price": 105000,
-      "mrp": 105000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/eim-101.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Compatible bin model",
-          "value": "In-built"
-        },
-        {
-          "key": "Rated capacity",
-          "value": "95 kg / 24 hrs"
-        },
-        {
-          "key": "Bin size",
-          "value": "36 kg"
-        },
-        {
-          "key": "Machine dimensions (W × D × H)",
-          "value": "660 × 685 × 920 mm"
-        },
-        {
-          "key": "Power consumption",
-          "value": "580 W"
-        },
-        {
-          "key": "Water consumption / 24 hrs",
-          "value": "150 L"
-        },
-        {
-          "key": "Cube size",
-          "value": "22 × 22 × 22 mm"
-        },
-        {
-          "key": "Electricals",
-          "value": "220 V / 1 Ph / 50 Hz"
-        }
-      ],
-      "features": [
-        "Low energy consumption: designed for maximum efficiency to reduce operating costs",
-        "Low water consumption: conserves water without compromising performance",
-        "Air-cooled system for consistent operation in varied environments",
-        "Control board with display for monitoring and adjustments",
-        "Vertical evaporator for reliable ice formation and improved efficiency"
-      ],
-      "applications": [
-        "Bar",
-        "HoReCa",
-        "Hospitals",
-        "Sports",
-        "Pharma"
-      ],
-      "badges": [
-        "SS 304",
-        "Energy Efficient"
-      ],
-      "temp": null,
-      "tempClass": "",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "eim-201",
-      "model": "EIM 201",
-      "name": "Ice Machine",
-      "brand": "Elanpro",
-      "category": "ice-machine",
-      "subcategory": "Ice Machines",
-      "familyId": "ice-machines",
-      "familyName": "Ice Machine",
-      "description": "Air-cooled ice machines with vertical evaporators and SS 304 bodies. Available in flake and dice ice options, with in-built or separate storage bins.",
-      "price": 195000,
-      "mrp": 195000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/eim-201.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Compatible bin model",
-          "value": "B 275"
-        },
-        {
-          "key": "Rated capacity",
-          "value": "191 kg / 24 hrs"
-        },
-        {
-          "key": "Bin size",
-          "value": "125 kg"
-        },
-        {
-          "key": "Machine dimensions (W × D × H)",
-          "value": "560 × 830 × 1718 mm"
-        },
-        {
-          "key": "Power consumption",
-          "value": "1100 W"
-        },
-        {
-          "key": "Water consumption / 24 hrs",
-          "value": "286 L"
-        },
-        {
-          "key": "Cube size",
-          "value": "22 × 22 × 22 mm"
-        },
-        {
-          "key": "Electricals",
-          "value": "220 V / 1 Ph / 50 Hz"
-        }
-      ],
-      "features": [
-        "Low energy consumption: designed for maximum efficiency to reduce operating costs",
-        "Low water consumption: conserves water without compromising performance",
-        "Air-cooled system for consistent operation in varied environments",
-        "Control board with display for monitoring and adjustments",
-        "Vertical evaporator for reliable ice formation and improved efficiency"
-      ],
-      "applications": [
-        "Bar",
-        "HoReCa",
-        "Hospitals",
-        "Sports",
-        "Pharma"
-      ],
-      "badges": [
-        "SS 304",
-        "Energy Efficient"
-      ],
-      "temp": null,
-      "tempClass": "",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "eim-1001",
-      "model": "EIM 1001",
-      "name": "Ice Machine",
-      "brand": "Elanpro",
-      "category": "ice-machine",
-      "subcategory": "Ice Machines",
-      "familyId": "ice-machines",
-      "familyName": "Ice Machine",
-      "description": "Air-cooled ice machines with vertical evaporators and SS 304 bodies. Available in flake and dice ice options, with in-built or separate storage bins.",
-      "price": 650000,
-      "mrp": 650000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EIM-1001-a-1.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/eim-1001.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Compatible bin model",
-          "value": "B 775"
-        },
-        {
-          "key": "Rated capacity",
-          "value": "909 kg / 24 hrs"
-        },
-        {
-          "key": "Bin size",
-          "value": "350 kg"
-        },
-        {
-          "key": "Machine dimensions (W × D × H)",
-          "value": "1227 × 973 × 2048 mm"
-        },
-        {
-          "key": "Power consumption",
-          "value": "3800 W"
-        },
-        {
-          "key": "Water consumption / 24 hrs",
-          "value": "1363 L"
-        },
-        {
-          "key": "Cube size",
-          "value": "22 × 22 × 22 mm"
-        },
-        {
-          "key": "Electricals",
-          "value": "380 V / 1 Ph / 50 Hz"
-        }
-      ],
-      "features": [
-        "Low energy consumption: designed for maximum efficiency to reduce operating costs",
-        "Low water consumption: conserves water without compromising performance",
-        "Air-cooled system for consistent operation in varied environments",
-        "Control board with display for monitoring and adjustments",
-        "Vertical evaporator for reliable ice formation and improved efficiency"
-      ],
-      "applications": [
-        "Bar",
-        "HoReCa",
-        "Hospitals",
-        "Sports",
-        "Pharma"
-      ],
-      "badges": [
-        "SS 304",
-        "Energy Efficient"
-      ],
-      "temp": null,
-      "tempClass": "",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "efm-101",
-      "model": "EFM 101",
-      "name": "Ice Flaker",
-      "brand": "Elanpro",
-      "category": "ice-machine",
-      "subcategory": "Ice Flakers",
-      "familyId": "ice-flaker",
-      "familyName": "Ice Flaker",
-      "description": "Flake ice machine with in-built bin, high-performing compressor and an energy-efficient cooling unit. Supplied with a free pre-filter.",
-      "price": 125000,
-      "mrp": 125000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/07/EFM-101-min.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/efm-101.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Compatible bin model",
-          "value": "In-built"
-        },
-        {
-          "key": "Rated capacity",
-          "value": "100 kg / 24 hrs"
-        },
-        {
-          "key": "Bin size",
-          "value": "20 kg"
-        },
-        {
-          "key": "Machine dimensions (W × D × H)",
-          "value": "520 × 550 × 960 mm"
-        },
-        {
-          "key": "Power consumption",
-          "value": "330 W"
-        },
-        {
-          "key": "Water consumption / 24 hrs",
-          "value": "110 L"
-        },
-        {
-          "key": "Electricals",
-          "value": "220 V / 1 Ph / 50 Hz"
-        }
-      ],
-      "features": [
-        "High-performing compressor",
-        "Eco-friendly refrigerant",
-        "Energy-efficient cooling unit",
-        "Free pre-filter"
-      ],
-      "applications": [
-        "Seafood Display",
-        "Salad Bars & Buffets",
-        "Bakeries & Desserts",
-        "Medical Storage",
-        "Catering & Events"
-      ],
-      "badges": [
-        "SS 304",
-        "Energy Efficient",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": null,
-      "tempClass": "",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "ekg-650-g",
-      "model": "EKG 650 G",
-      "name": "Flat Glass Top Freezer",
-      "brand": "Elanpro",
-      "category": "retail-solution",
-      "subcategory": "Flat Glass Top",
-      "familyId": "flat-glass-top",
-      "familyName": "Flat Glass Top Freezer",
-      "description": "Premium series flat glass top freezer with sliding glass door, unique dual condenser and high insulation.",
-      "price": 52000,
-      "mrp": 52000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/ekg-flat.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Star rating",
-          "value": "5"
-        },
-        {
-          "key": "Capacity",
-          "value": "566 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1800 × 694 × 850 mm"
-        },
-        {
-          "key": "Baskets",
-          "value": "9"
-        },
-        {
-          "key": "LED",
-          "value": "Yes"
-        },
-        {
-          "key": "Energy consumption",
-          "value": "2007 kWh/yr"
-        },
-        {
-          "key": "Castors",
-          "value": "Yes"
-        },
-        {
-          "key": "Lock",
-          "value": "Yes"
-        },
-        {
-          "key": "Temperature range",
-          "value": "−16°C to −24°C"
-        },
-        {
-          "key": "Digital display",
-          "value": "Yes"
-        }
-      ],
-      "features": [
-        "High-performing cooling system",
-        "Low power consumption",
-        "Sliding glass door",
-        "Durable castors",
-        "High insulation",
-        "Unique dual condenser",
-        "Digital display"
-      ],
-      "applications": [],
-      "badges": [
-        "Energy Efficient",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": -24,
-        "max": -16
-      },
-      "tempClass": "Freezer",
-      "capacityL": 566,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "ef-825-g",
-      "model": "EF 825 G",
-      "name": "Hard Top Freezer cum Chiller",
-      "brand": "Elanpro",
-      "category": "retail-solution",
-      "subcategory": "Hard Top",
-      "familyId": "hard-top-freezer-chiller",
-      "familyName": "Hard Top Freezer cum Chiller",
-      "description": "Premium series dual-temperature convertible freezer and chiller, designed to perform at 43°C ambient with extra-low cooling up to −32°C.",
-      "price": 45500,
-      "mrp": 45500,
-      "priceSource": "listed",
-      "images": [
-        {
-          "url": "/images/products/ef-555g.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Star rating",
-          "value": "5"
-        },
-        {
-          "key": "Capacity",
-          "value": "757 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "2415 × 695 × 842 mm"
-        },
-        {
-          "key": "Baskets",
-          "value": "2"
-        },
-        {
-          "key": "No. of doors",
-          "value": "3"
-        },
-        {
-          "key": "Energy consumption",
-          "value": "1442 kWh/yr"
-        },
-        {
-          "key": "Castors",
-          "value": "Yes"
-        },
-        {
-          "key": "Lock",
-          "value": "Yes"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 8°C / −18°C to −25°C"
-        }
-      ],
-      "features": [
-        "Dual-temperature convertible freezer & chiller",
-        "High insulation",
-        "Castors for easy mobility",
-        "Hinge door",
-        "Unique dual condenser",
-        "Extra-low cooling up to −32°C",
-        "Designed to perform at high ambient 43°C"
-      ],
-      "applications": [],
-      "badges": [
-        "Energy Efficient",
-        "Premium"
-      ],
-      "temp": {
-        "min": -25,
-        "max": 8
-      },
-      "tempClass": "Dual / convertible",
-      "capacityL": 757,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "ecg-305",
-      "model": "ECG 305",
-      "name": "Upright Display Chiller",
-      "brand": "Elanpro",
-      "category": "retail-solution",
-      "subcategory": "Upright Showcase Chiller",
-      "familyId": "upright-chiller",
-      "familyName": "Upright Display Chiller",
-      "description": "Upright showcase chiller designed for high ambient, with a back-lit canopy that boosts branding and LED lighting for better visibility.",
-      "price": 32000,
-      "mrp": 32000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/ecg-305.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "300 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "560 × 618 × 1674 mm"
-        },
-        {
-          "key": "Shelves",
-          "value": "4"
-        },
-        {
-          "key": "Doors / type",
-          "value": "1 / Glass"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 10°C"
-        },
-        {
-          "key": "Digital controller",
-          "value": "NA"
-        },
-        {
-          "key": "Input power",
-          "value": "164 W"
-        }
-      ],
-      "features": [
-        "LED lighting for better visibility",
-        "Low power consumption",
-        "High insulation",
-        "Removable gasket",
-        "Castor & lock available",
-        "Back-lit canopy boosts branding",
-        "Adjustable shelves"
-      ],
-      "applications": [],
-      "badges": [
-        "Energy Efficient",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 10
-      },
-      "tempClass": "Chiller",
-      "capacityL": 300,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "ecg-1506",
-      "model": "ECG 1506",
-      "name": "Upright Display Chiller",
-      "brand": "Elanpro",
-      "category": "retail-solution",
-      "subcategory": "Upright Showcase Chiller",
-      "familyId": "upright-chiller",
-      "familyName": "Upright Display Chiller",
-      "description": "Upright showcase chiller designed for high ambient, with a back-lit canopy that boosts branding and LED lighting for better visibility.",
-      "price": 145000,
-      "mrp": 145000,
-      "priceSource": "listed",
-      "images": [
-        {
-          "url": "/images/products/ecg-1506.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "1500 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1800 × 590 × 2015 mm"
-        },
-        {
-          "key": "Shelves",
-          "value": "12"
-        },
-        {
-          "key": "Doors / type",
-          "value": "3 / Glass"
-        },
-        {
-          "key": "Temperature range",
-          "value": "2°C to 10°C"
-        },
-        {
-          "key": "Digital controller",
-          "value": "Yes"
-        },
-        {
-          "key": "Input power",
-          "value": "600 W"
-        }
-      ],
-      "features": [
-        "LED lighting for better visibility",
-        "Low power consumption",
-        "High insulation",
-        "Removable gasket",
-        "Castor & lock available",
-        "Back-lit canopy boosts branding",
-        "Adjustable shelves"
-      ],
-      "applications": [],
-      "badges": [
-        "Energy Efficient",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": 2,
-        "max": 10
-      },
-      "tempClass": "Chiller",
-      "capacityL": 1500,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "efgv-1000",
-      "model": "EFGV 1000",
-      "name": "Upright Display Freezer",
-      "brand": "Elanpro",
-      "category": "retail-solution",
-      "subcategory": "Upright Showcase Freezer",
-      "familyId": "upright-freezer",
-      "familyName": "Upright Display Freezer",
-      "description": "Frost-free upright showcase freezer with triple-pane heated glass door, tropicalised for harsh Indian weather conditions.",
-      "price": 165000,
-      "mrp": 165000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/06/EFGV-1000-2.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/efgv.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Capacity",
-          "value": "1000 L"
-        },
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1370 × 700 × 1985 mm"
-        },
-        {
-          "key": "Shelves",
-          "value": "10"
-        },
-        {
-          "key": "Doors / type",
-          "value": "2 / Glass"
-        },
-        {
-          "key": "Temperature range",
-          "value": "−16°C to −20°C"
-        },
-        {
-          "key": "Digital controller",
-          "value": "Yes"
-        },
-        {
-          "key": "Input power",
-          "value": "1011 W"
-        }
-      ],
-      "features": [
-        "LED lighting for better visibility",
-        "High insulation",
-        "Removable gasket",
-        "Tropicalised for harsh Indian weather conditions",
-        "Castor & lock available",
-        "Triple-pane heated glass door",
-        "Frost-free technology"
-      ],
-      "applications": [],
-      "badges": [
-        "Frost Free",
-        "Digital Controller",
-        "Eco-Friendly Refrigerant"
-      ],
-      "temp": {
-        "min": -20,
-        "max": -16
-      },
-      "tempClass": "Freezer",
-      "capacityL": 1000,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "galaxy",
-      "model": "Galaxy",
-      "name": "Snacks & Beverages Vending Machine",
-      "brand": "Elanpro",
-      "category": "vending-machine",
-      "subcategory": "Snacks & Beverages",
-      "familyId": "vending",
-      "familyName": "Vending Machine",
-      "description": "UPI-based vending with cashless payments, direct funds transfer, an anti-theft delivery bin and inventory management through the Wendor dashboard.",
-      "price": 325000,
-      "mrp": 325000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/galaxy.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1180 × 890 × 1985 mm"
-        },
-        {
-          "key": "Touchscreen interface",
-          "value": "10 / 22 inch"
-        },
-        {
-          "key": "SKUs",
-          "value": "60 varieties (max)"
-        },
-        {
-          "key": "No. of trays",
-          "value": "6"
-        },
-        {
-          "key": "Temperature range",
-          "value": "4°C to 25°C"
-        },
-        {
-          "key": "Voltage",
-          "value": "220 V / 50 Hz"
-        },
-        {
-          "key": "Power (refrigerated / normal)",
-          "value": "422 / 24 W"
-        },
-        {
-          "key": "Weight",
-          "value": "350 kg"
-        },
-        {
-          "key": "Capacity",
-          "value": "360–510 pcs"
-        }
-      ],
-      "features": [
-        "Seamless touchscreen interface",
-        "40 mm foaming insulation",
-        "Adjustable shelving heights",
-        "Easy spiral adjusting with pull & twist mechanism",
-        "Anti-theft delivery bin, inventory management",
-        "Cashless payments, direct funds transfer"
-      ],
-      "applications": [
-        "Snacks",
-        "Beverages",
-        "Chocolate",
-        "Medicines & Health Products"
-      ],
-      "badges": [
-        "UPI Payments"
-      ],
-      "temp": {
-        "min": 4,
-        "max": 25
-      },
-      "tempClass": "Chiller",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "nova",
-      "model": "Nova",
-      "name": "Elevator Vending Machine",
-      "brand": "Elanpro",
-      "category": "vending-machine",
-      "subcategory": "Elevator Vending",
-      "familyId": "vending",
-      "familyName": "Vending Machine",
-      "description": "UPI-based vending with cashless payments, direct funds transfer, an anti-theft delivery bin and inventory management through the Wendor dashboard.",
-      "price": 390000,
-      "mrp": 390000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/nova.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1275 × 790 × 1940 mm"
-        },
-        {
-          "key": "Touchscreen interface",
-          "value": "22 inch"
-        },
-        {
-          "key": "SKUs",
-          "value": "42 varieties (max)"
-        },
-        {
-          "key": "No. of trays",
-          "value": "6"
-        },
-        {
-          "key": "Temperature range",
-          "value": "4°C to 25°C"
-        },
-        {
-          "key": "Voltage",
-          "value": "220 V / 50 Hz"
-        },
-        {
-          "key": "Power (refrigerated / normal)",
-          "value": "422 / 24 W"
-        },
-        {
-          "key": "Weight",
-          "value": "370 kg"
-        },
-        {
-          "key": "Capacity",
-          "value": "300–350 pcs"
-        }
-      ],
-      "features": [
-        "Seamless touchscreen interface",
-        "40 mm foaming refrigeration system",
-        "Adjustable shelving heights",
-        "Smooth elevator delivery, perfect for fragile products",
-        "Anti-theft delivery bin, inventory management",
-        "Cashless payments, direct funds transfer"
-      ],
-      "applications": [
-        "Liquor",
-        "Electronics",
-        "Jewelry",
-        "Cosmetics"
-      ],
-      "badges": [
-        "UPI Payments"
-      ],
-      "temp": {
-        "min": 4,
-        "max": 25
-      },
-      "tempClass": "Chiller",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "frozone",
-      "model": "Frozone",
-      "name": "Frozen Food & Ice Cream Vending Machine",
-      "brand": "Elanpro",
-      "category": "vending-machine",
-      "subcategory": "Frozen Vending",
-      "familyId": "vending",
-      "familyName": "Vending Machine",
-      "description": "UPI-based vending with cashless payments, direct funds transfer, an anti-theft delivery bin and inventory management through the Wendor dashboard.",
-      "price": 450000,
-      "mrp": 450000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/frozone.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1375 × 875 × 1940 mm"
-        },
-        {
-          "key": "Touchscreen interface",
-          "value": "22 inch"
-        },
-        {
-          "key": "SKUs",
-          "value": "60 varieties (max)"
-        },
-        {
-          "key": "No. of trays",
-          "value": "6"
-        },
-        {
-          "key": "Temperature range",
-          "value": "4°C to −18°C"
-        },
-        {
-          "key": "Voltage",
-          "value": "220 V / 50 Hz"
-        },
-        {
-          "key": "Power (refrigerated / normal)",
-          "value": "422 / 24 W"
-        },
-        {
-          "key": "Weight",
-          "value": "370 kg"
-        },
-        {
-          "key": "Capacity",
-          "value": "340 pcs"
-        }
-      ],
-      "features": [
-        "Temperature up to −18°C",
-        "Seamless touchscreen interface",
-        "40 mm foaming refrigeration system",
-        "Adjustable shelving heights",
-        "Smooth elevator delivery, perfect for fragile products",
-        "Cashless payments, direct funds transfer"
-      ],
-      "applications": [
-        "Frozen Food",
-        "Ice Cream"
-      ],
-      "badges": [
-        "UPI Payments"
-      ],
-      "temp": {
-        "min": -18,
-        "max": 4
-      },
-      "tempClass": "Dual / convertible",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "orion",
-      "model": "Orion",
-      "name": "All-Purpose Vending Machine with QR Code",
-      "brand": "Elanpro",
-      "category": "vending-machine",
-      "subcategory": "Snacks & Beverages",
-      "familyId": "vending",
-      "familyName": "Vending Machine",
-      "description": "UPI-based vending with cashless payments, direct funds transfer, an anti-theft delivery bin and inventory management through the Wendor dashboard.",
-      "price": 185000,
-      "mrp": 185000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "https://elanpro.net/wp-content/uploads/2025/06/orion-1.png",
-          "publicId": ""
-        },
-        {
-          "url": "/images/products/orion.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "630 × 870 × 1940 mm"
-        },
-        {
-          "key": "Touchscreen interface",
-          "value": "QR / 10 inch screen"
-        },
-        {
-          "key": "SKUs",
-          "value": "60 varieties (max)"
-        },
-        {
-          "key": "No. of trays",
-          "value": "6"
-        },
-        {
-          "key": "Temperature range",
-          "value": "4°C to 25°C"
-        },
-        {
-          "key": "Voltage",
-          "value": "220 V / 50 Hz"
-        },
-        {
-          "key": "Power (refrigerated / normal)",
-          "value": "422 / 24 W"
-        },
-        {
-          "key": "Weight",
-          "value": "190 kg"
-        },
-        {
-          "key": "Capacity",
-          "value": "180 pcs"
-        }
-      ],
-      "features": [
-        "Budget-friendly all-purpose vending machine",
-        "40 mm foaming refrigeration system",
-        "Direct QR code access to web app interface",
-        "Cashless payments, direct funds transfer",
-        "Anti-theft delivery bin",
-        "Inventory management"
-      ],
-      "applications": [
-        "Snacks",
-        "Beverages",
-        "Chocolate",
-        "Medicines"
-      ],
-      "badges": [
-        "UPI Payments"
-      ],
-      "temp": {
-        "min": 4,
-        "max": 25
-      },
-      "tempClass": "Chiller",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    },
-    {
-      "slug": "apollo",
-      "model": "Apollo",
-      "name": "Smart Locker for Vending & Storage",
-      "brand": "Elanpro",
-      "category": "vending-machine",
-      "subcategory": "Smart Lockers",
-      "familyId": "vending",
-      "familyName": "Vending Machine",
-      "description": "UPI-based vending with cashless payments, direct funds transfer, an anti-theft delivery bin and inventory management through the Wendor dashboard.",
-      "price": 240000,
-      "mrp": 240000,
-      "priceSource": "indicative",
-      "images": [
-        {
-          "url": "/images/products/apollo.webp",
-          "publicId": ""
-        }
-      ],
-      "specs": [
-        {
-          "key": "Dimensions (W × D × H)",
-          "value": "1080 × 440 × 1840 mm"
-        },
-        {
-          "key": "Touchscreen interface",
-          "value": "10 / 13 / 15 inch"
-        },
-        {
-          "key": "SKUs",
-          "value": "17 / 19 / 24 / 37 slots"
-        },
-        {
-          "key": "No. of trays",
-          "value": "6"
-        },
-        {
-          "key": "Temperature range",
-          "value": "Ambient"
-        },
-        {
-          "key": "Voltage",
-          "value": "220 V / 50 Hz"
-        },
-        {
-          "key": "Power (refrigerated / normal)",
-          "value": "422 / 24 W"
-        },
-        {
-          "key": "Weight",
-          "value": "As per slots"
-        },
-        {
-          "key": "Capacity",
-          "value": "NA"
-        }
-      ],
-      "features": [
-        "Intuitive touchscreen for easy navigation",
-        "Detailed logs for tracking user activities",
-        "Supports biometric and payment authorisation",
-        "Remote monitoring available on mobile and web",
-        "Self-service automated inventory tracking",
-        "API and ERP integration for seamless connectivity"
-      ],
-      "applications": [
-        "Bags",
-        "Helmets",
-        "Gloves & PPE Kits",
-        "Industrial Tools"
-      ],
-      "badges": [
-        "UPI Payments"
-      ],
-      "temp": null,
-      "tempClass": "",
-      "capacityL": null,
-      "refrigerant": "",
-      "cooling": ""
-    }
-  ],
+  "products": [],
   "banners": [
     {
       "badge": "Featured solution",
