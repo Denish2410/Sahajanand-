@@ -21,7 +21,12 @@ app.set('trust proxy', 1);
 
 // 2. Security headers & compression
 // The API serves JSON and uploaded images to the storefront on another origin
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  })
+);
 app.use(compression());
 
 // 3. CORS — allow configured client URLs + no-origin for server-to-server/webhooks

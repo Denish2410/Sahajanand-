@@ -12,6 +12,7 @@ import ProductsAdmin from './ProductsAdmin.jsx';
 import { CategoriesAdmin, CouponsAdmin, OffersAdmin } from './CatalogAdmin.jsx';
 import { OrdersAdmin, EnquiriesAdmin, CustomersAdmin } from './SalesAdmin.jsx';
 import { SettingsAdmin, ActivityAdmin } from './SettingsAdmin.jsx';
+import { GoogleButton } from '../pages/Auth/Auth.jsx';
 import '../pages/Account/Account.css';
 import '../pages/Auth/Auth.css';
 import './admin.css';
@@ -28,11 +29,19 @@ const PAGES = NAV.flatMap(([, items]) => items);
 const Logo = ({ className }) => <p className={className}>SAHAJANAND<span aria-hidden="true" /> <small>Admin</small></p>;
 
 function AdminLogin() {
-  const { login, logout, authConfigured } = useApp();
+  const { login, loginWithGoogle, logout, authConfigured } = useApp();
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const checkRole = async (user) => {
+    if (!['admin', 'superadmin'].includes(user.role)) {
+      await logout();
+      setError('This account does not have admin access.');
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !pw) return setError('Enter your admin email and password.');
@@ -40,17 +49,28 @@ function AdminLogin() {
     const res = await login(email, pw, { remember: true });
     setBusy(false);
     if (!res.ok) return setError(res.error);
-    if (!['admin', 'superadmin'].includes(res.user.role)) {
-      await logout();
-      setError('This account does not have admin access.');
-    }
+    await checkRole(res.user);
   };
+
+  const handleGoogle = async () => {
+    setBusy(true); setError('');
+    const res = await loginWithGoogle();
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    await checkRole(res.user);
+  };
+
   return (
     <div className="ad-login">
       <form onSubmit={submit} noValidate>
         <Logo className="ad-login__logo" />
         <h1>Admin sign in</h1>
         {!authConfigured && <p className="field-error" role="alert">Sign-in is not configured for this site yet.</p>}
+
+        <GoogleButton onClick={handleGoogle} busy={busy || !authConfigured} text="Sign in with Google" />
+
+        <div className="auth__divider"><span>or with password</span></div>
+
         <div className="field"><label htmlFor="al-id">Admin email</label><input id="al-id" className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} autoComplete="username" autoFocus /></div>
         <div className="field"><label htmlFor="al-pw">Password</label><input id="al-pw" className="input" type="password" value={pw} onChange={(e) => { setPw(e.target.value); setError(''); }} autoComplete="current-password" /></div>
         {error && <p className="field-error" role="alert">{error}</p>}

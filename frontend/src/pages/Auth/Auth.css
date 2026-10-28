@@ -20,6 +20,34 @@
 .auth__info { font-size: var(--fs-0); background: var(--paper); border: 1px solid var(--line); padding: 0.7rem 0.8rem; border-radius: var(--r-1); }
 .auth__divider { display: flex; align-items: center; gap: 0.75rem; font-size: var(--fs-0); color: var(--ink-3); margin-top: 0.25rem; }
 .auth__divider::before, .auth__divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.btn-google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  font-weight: 600;
+  font-size: var(--fs-0);
+  padding: 0.65rem 1rem;
+  border-radius: var(--r-1);
+  transition: background-color 0.2s, box-shadow 0.2s, border-color 0.2s;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+  cursor: pointer;
+}
+.btn-google:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #c6c9ce;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.16);
+}
+.btn-google:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-google .google-icon {
+  flex-shrink: 0;
+}
 .auth__admin { text-align: center; }
 @media (max-width: 720px) {
   .auth__card { grid-template-columns: 1fr; }

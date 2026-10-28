@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut,
   sendPasswordResetEmail, sendEmailVerification, updateProfile as fbUpdateProfile, updatePassword,
   reauthenticateWithCredential, EmailAuthProvider, setPersistence, browserLocalPersistence, browserSessionPersistence,
 } from 'firebase/auth';
-import { auth, authConfigured } from '../services/firebase.js';
+import { auth, authConfigured, googleProvider } from '../services/firebase.js';
 import { api, ApiError } from '../services/api.js';
 import { toProduct, toCategory, toBanner, toCartLine } from '../services/mappers.js';
 
@@ -40,6 +40,7 @@ const AUTH_ERRORS = {
   'auth/weak-password': { field: 'password', error: 'Choose a stronger password (at least 6 characters).' },
   'auth/user-disabled': { field: 'email', error: 'This account has been disabled. Contact us for help.' },
   'auth/too-many-requests': { field: 'password', error: 'Too many attempts. Please wait a few minutes and try again.' },
+  'auth/operation-not-allowed': { field: 'form', error: 'Email/Password sign-in is disabled in your Firebase project. Please enable it in Firebase Console > Authentication > Sign-in method.' },
   'auth/network-request-failed': { field: 'form', error: 'We could not reach the sign-in service. Check your connection and try again.' },
   'auth/requires-recent-login': { field: 'form', error: 'Please sign out, sign in again, and retry.' },
 };
@@ -141,6 +142,24 @@ export function AppProvider({ children }) {
       return { ok: true, user: profile };
     } catch (err) {
       freshSignIn.current = false;
+      if (err instanceof ApiError) await signOut(auth).catch(() => {});
+      return authFailure(err);
+    }
+  }, [syncUser]);
+
+  const loginWithGoogle = useCallback(async () => {
+    if (!auth) return NO_AUTH;
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      freshSignIn.current = true;
+      const cred = await signInWithPopup(auth, googleProvider);
+      const profile = await syncUser(cred.user);
+      return { ok: true, user: profile };
+    } catch (err) {
+      freshSignIn.current = false;
+      if (err?.code === 'auth/popup-closed-by-user') {
+        return { ok: false, field: 'form', error: 'Google sign-in was cancelled.' };
+      }
       if (err instanceof ApiError) await signOut(auth).catch(() => {});
       return authFailure(err);
     }
@@ -368,7 +387,7 @@ export function AppProvider({ children }) {
     products, categories, offers, COUPONS: catalogue.coupons, settings, setSettings,
     // session
     user, isAdmin, isSuperAdmin, authReady, authConfigured,
-    login, signup, logout, resetPassword, changePassword, updateProfile,
+    login, signup, loginWithGoogle, logout, resetPassword, changePassword, updateProfile,
     // quote modal, compare, toast
     quote, openQuote, closeQuote,
     compare, toggleCompare, clearCompare, notice, setNotice,

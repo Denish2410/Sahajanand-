@@ -33,8 +33,9 @@ async function verifyFirebaseSetup() {
     console.log('   3. Copy the "private_key" value from the downloaded JSON file into your .env as FIREBASE_PRIVATE_KEY.\n');
   }
 
+  const { getApps } = require('firebase-admin/app');
   console.log('\n2. Testing Firebase Admin SDK connection:');
-  if (!admin.apps.length) {
+  if (getApps().length === 0) {
     console.log('❌ Firebase Admin is not initialized. Please ensure valid credentials in .env.');
     process.exit(1);
   }
