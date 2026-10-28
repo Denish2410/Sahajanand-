@@ -34,7 +34,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (webhooks, server-to-server, curl)
     if (!origin) return callback(null, true);
-    if (config.clientUrls.includes(origin)) {
+    if (config.clientUrls.includes(origin) || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
     callback(new Error(`CORS: origin ${origin} not allowed`));
