@@ -183,7 +183,8 @@ export function Signup() {
     const res = await loginWithGoogle();
     setBusy(false);
     if (!res.ok) return setErrors({ form: res.error });
-    navigate(next, { replace: true });
+    const staff = res.user.role === 'admin' || res.user.role === 'superadmin';
+    navigate(staff ? '/admin' : next, { replace: true });
   };
 
   const submit = async (e) => {
@@ -200,7 +201,8 @@ export function Signup() {
     const res = await signup(v);
     setBusy(false);
     if (!res.ok) return setErrors({ [res.field]: res.error });
-    navigate(next, { replace: true });
+    const staff = res.user.role === 'admin' || res.user.role === 'superadmin';
+    navigate(staff ? '/admin' : next, { replace: true });
   };
   const field = (k, label, props = {}) => (
     <div className="field">

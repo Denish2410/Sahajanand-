@@ -112,11 +112,17 @@ function Editor({ initial, categories, onClose, onSaved }) {
   const save = async () => {
     const problem = validate(f);
     if (problem) return setFlash({ ok: false, text: problem });
+    const isEdit = Boolean(product);
     const saved = await run(
       () => (product ? api.admin.updateProduct(product._id, toPayload(f)) : api.admin.createProduct(toPayload(f))),
       product ? 'Product saved.' : 'Product created. You can now add images.'
     );
-    if (saved) { setProduct(saved); setF(toForm(saved)); onSaved(); }
+    if (saved) {
+      setProduct(saved); setF(toForm(saved)); onSaved();
+      // Close the panel after updating an existing product;
+      // keep it open for new products so the admin can add images.
+      if (isEdit) onClose();
+    }
   };
   const setSpec = (i, k, v) => setF({ ...f, specs: f.specs.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
   const moveSpec = (i, d) => {

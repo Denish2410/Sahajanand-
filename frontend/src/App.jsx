@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { matchPath, useLocation } from './router/index.jsx';
+import { lazy, Suspense, useEffect } from 'react';
+import { matchPath, useLocation, useNavigate } from './router/index.jsx';
 import Navbar from './components/Navbar/Navbar.jsx';
 import Footer from './components/Footer/Footer.jsx';
 import QuoteModal from './components/QuoteModal/QuoteModal.jsx';
@@ -61,7 +61,17 @@ function Boot({ status, onRetry }) {
 
 export default function App() {
   const { pathname } = useLocation();
-  const { settings, isAdmin, catalogueStatus, reloadCatalogue } = useApp();
+  const navigate = useNavigate();
+  const { settings, isAdmin, authReady, catalogueStatus, reloadCatalogue } = useApp();
+
+  // Auto-redirect admin users to /admin when they land on a storefront page.
+  // This runs on first load / session restore so admins go straight to the panel.
+  const isStorefrontPage = !(pathname === '/admin' || pathname.startsWith('/admin/'));
+  useEffect(() => {
+    if (authReady && isAdmin && isStorefrontPage) {
+      navigate('/admin', { replace: true });
+    }
+  }, [authReady, isAdmin, isStorefrontPage, navigate]);
 
   // The admin panel has its own layout: no storefront header, footer or cart.
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
